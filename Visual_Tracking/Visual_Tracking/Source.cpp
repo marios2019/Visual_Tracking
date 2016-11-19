@@ -20,7 +20,7 @@ using namespace cv;
 using namespace std;
 
 // Render function
-void rendering(vector <Point3f>&, vector <vector <int>>&, Mat);
+void rendering(vector <Point3f>&, vector <vector <int>>&, float, float, float, float, float, float, Mat);
 
 int main(int, char** argv)
 {
@@ -82,46 +82,60 @@ int main(int, char** argv)
 		}
 	}
 
-	// Camera calibration
+	// Camera Extrinsics
 	// Camera position
-	float t_x = 3.f;
+	float t_x = 1.f;
 	float t_y = 1.f;
-	float t_z = 80.f;
-	// F.O.V
-	float fov = 50.f;
+	float t_z = 100.f;
 	// Rotation x-axis
 	float theta_x = 20.f * PI / 180.f;
+	// Rotation y-axis
+	float theta_y = 180.f * PI / 180.f;
+	// Rotation z-axis
+	float theta_z = 180.f * PI / 180.f;
+	// Camera Intrinsics
+	// F.O.V
+	float fov = 50.f;
 	// Principal point - center of image plane
 	float u_0 = WIDTH / 2;
 	float v_0 = HEIGHT / 2;
 	// Focal length
 	float f = (WIDTH / 2) / (float) (tan((fov / 2) * PI / 180.0));
-	// Camera extrinsics
-	Mat E = (Mat_<float>(3, 4) << 1, 0, 0, t_x, 0, cos(theta_x), -sin(theta_x), t_y, 0, sin(theta_x), cos(theta_x), t_z);
-	// Camera intrinsics
+	// Camera intrinsics Matrix
 	Mat K = (Mat_<float>(3, 3) << f, 0, u_0, 0, f, v_0, 0, 0, 1);
-	// Perpective Projection Matrix
-	Mat P(3, 4, CV_32FC1, Scalar::all(0));
-	P = K * E;
-
-	cout << P << endl;
 	
 	// Render model
-	rendering(vertices, edges, P);
+	rendering(vertices, edges, theta_x, theta_y, theta_z, t_x, t_y, t_z, K);
 
 	return 0;
 }
 
 // Render function
-void rendering(vector <Point3f>& vertices, vector <vector <int>>& edges, Mat P)
+void rendering(vector <Point3f>& vertices, vector <vector <int>>& edges, float theta_x, float theta_y, float theta_z, float t_x, float t_y, float t_z, Mat K)
 {
 	// Image plane 300x400 pixels
-	Mat cuboid(HEIGHT, WIDTH, CV_8U, Scalar::all(255));
+	Mat model(HEIGHT, WIDTH, CV_8U, Scalar::all(255));
 	
+	// Camera calibration
+	// Translation Vector;
+	Mat T = (Mat_<float>(3, 1) << t_x, t_y, t_z);
+	// Rotation x-axis Matrix
+	Mat R_x = (Mat_<float>(3, 3) << 1, 0, 0, 0, cos(theta_x), -sin(theta_x), 0, sin(theta_x), cos(theta_x));
+	// Rotation y-axis Matrix
+	Mat R_y = (Mat_<float>(3, 3) << cos(theta_y), 0, sin(theta_y), 0, 1, 0, -sin(theta_y), 0, cos(theta_y));
+	// Rotation z-axis Matrix
+	Mat R_z = (Mat_<float>(3, 3) << cos(theta_z), -sin(theta_z), 0, sin(theta_z), cos(theta_z), 0, 0, 0, 1);
+	// Rotation Matrix
+	Mat R = R_z * R_y * R_x;
+	// Camera extrinsics
+	Mat E = (Mat_<float>(3, 4) << R.at<float>(0, 0), R.at<float>(0, 1), R.at<float>(0, 2), T.at<float>(0, 0), R.at<float>(1, 0), R.at<float>(1, 1), R.at<float>(1, 2), T.at<float>(1, 0), R.at<float>(2, 0), R.at<float>(2, 1), R.at<float>(2, 2), T.at<float>(2, 0));
+	// Perpective Projection Matrix
+	Mat	P = K * E;
+
 	// Project vertices to image plane using perspective projection - camera coordinates
 	vector <Point3f> vertices_homo;
 	vector <Point2i> vertices_camera;
-	
+	cout << "Pixel coordinates: " << endl;
 	for (int i = 0; i < vertices.size(); i++)
 	{
 		// Convert vertex coordinates to homogeneous coordinates
@@ -130,27 +144,22 @@ void rendering(vector <Point3f>& vertices, vector <vector <int>>& edges, Mat P)
 		tmp1.push_back(vertices[i].y);
 		tmp1.push_back(vertices[i].z);
 		tmp1.push_back(1.f);
-			
+		
 		// Perspective projection
 		Mat tmp2 = P * Mat(tmp1, false);
 		Point3f tmp3(tmp2);
-		vertices_homo.push_back(tmp3);
-		
+
 		// Pixel coordinates
 		Point2f tmp4((tmp3.x / tmp3.z), (tmp3.y / tmp3.z));
-		//
-
 		Point2i tmp5(tmp4);
 		vertices_camera.push_back(tmp5);
 		cout << vertices_camera[i] << endl;
 	}
 
-	/*perspectiveTransform(vertices, vertices_camera, P);*/
-	
 	// Draw vertices
-	for (int i = 0; i < vertices_camera.size(); i++)
+	for (int i = 0; i < vertices_camera.size() ; i++)
 	{
-		cuboid.at<uchar>(vertices_camera[i].y, vertices_camera[i].x) = 0;
+		model.at<uchar>(vertices_camera[i].y, vertices_camera[i].x) = 0;
 	}
 	// Draw edges
 	for (int i = 0; i < edges.size(); i++)
@@ -159,12 +168,12 @@ void rendering(vector <Point3f>& vertices, vector <vector <int>>& edges, Mat P)
 		tmp = edges[i];
 		Point2i p1(vertices_camera[tmp[0]]);
 		Point2i p2(vertices_camera[tmp[1]]);
-		line(cuboid, p1, p2, Scalar::all(0), 1, CV_AA, 0);
+		line(model, p1, p2, Scalar::all(0), 1, CV_AA, 0);
 	}
 
 	// Display model
 	const char* window_name = "Cuboid";
 	namedWindow(window_name, WINDOW_AUTOSIZE);
-	imshow(window_name, cuboid);
+	imshow(window_name, model);
 	waitKey(0);
 }
