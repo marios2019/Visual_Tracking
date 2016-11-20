@@ -19,15 +19,65 @@
 using namespace cv;
 using namespace std;
 
+// Read model data from .x file
+void model_data(int, char**, vector <Point3f>&, vector <vector <int>>&);
 // Render function
 void rendering(vector <Point3f>&, vector <vector <int>>&, float, float, float, float, float, float, Mat);
 
-int main(int, char** argv)
+int main(int argc, char** argv)
 {
 	// Initialization local coordinates
 	vector <Point3f> vertices;
 	vector <vector <int>> edges;
+
+	// Read from .x file
+	model_data(argc, argv, vertices, edges);
+
+	// Camera Extrinsics
+	// Camera position
+	float t_x = 1.f;
+	float t_y = 1.f;
+	float t_z = 90.f;
+	// Rotation x-axis
+	float theta_x = 20.f * PI / 180.f;
+	// Rotation y-axis
+	float theta_y = 180.f * PI / 180.f;
+	// Rotation z-axis
+	float theta_z = 180.f * PI / 180.f;
+	// Camera Intrinsics
+	// F.O.V
+	float fov = 50.f;
+	// Principal point - center of image plane
+	float u_0 = WIDTH / 2;
+	float v_0 = HEIGHT / 2;
+	// Focal length
+	float f = (WIDTH / 2) / (float) (tan((fov / 2) * PI / 180.0));
+	// Camera intrinsics Matrix
+	Mat K = (Mat_<float>(3, 3) << f, 0, u_0, 0, f, v_0, 0, 0, 1);
 	
+	// Render model
+	rendering(vertices, edges, theta_x, theta_y, theta_z, t_x, t_y, t_z, K);
+
+	exit(EXIT_SUCCESS);
+}
+
+// Read model data from .x file
+void model_data(int argc, char **argv, vector<Point3f>& vertices, vector<vector<int>>& edges)
+{
+	// Check if input .x file has been provided
+	if (argc < 2)
+	{
+		cout << "Provide input model file with .x extension." << endl;
+		system("PAUSE");
+		exit(EXIT_FAILURE);
+	}
+	// Check for too many arguments
+	if (argc > 2)
+	{
+		cout << "Provide only one input file." << endl;
+		system("PAUSE");
+		exit(EXIT_FAILURE);
+	}
 	ifstream file(argv[1]);
 	// Check if input is empty or the file is empty
 	if ((!file.is_open()) || (file.peek() == ifstream::traits_type::eof()))
@@ -35,7 +85,7 @@ int main(int, char** argv)
 		cout << "Provide input images file with .x extension and " << endl;
 		cout << "make sure it's not empty: ";
 		system("PAUSE");
-		return (0);
+		exit(EXIT_FAILURE);
 	}
 	string line;
 	// Read vertices and lines from .x file
@@ -68,7 +118,7 @@ int main(int, char** argv)
 				v.push_back(stoi(data[i]));
 			}
 
-			Point3f tmp((float) v[0], (float) v[1], (float) v[2]);
+			Point3f tmp((float)v[0], (float)v[1], (float)v[2]);
 			vertices.push_back(tmp);
 		}
 		else if (!(data[0].compare("edge")))
@@ -81,33 +131,6 @@ int main(int, char** argv)
 			edges.push_back(tmp);
 		}
 	}
-
-	// Camera Extrinsics
-	// Camera position
-	float t_x = 1.f;
-	float t_y = 1.f;
-	float t_z = 100.f;
-	// Rotation x-axis
-	float theta_x = 20.f * PI / 180.f;
-	// Rotation y-axis
-	float theta_y = 180.f * PI / 180.f;
-	// Rotation z-axis
-	float theta_z = 180.f * PI / 180.f;
-	// Camera Intrinsics
-	// F.O.V
-	float fov = 50.f;
-	// Principal point - center of image plane
-	float u_0 = WIDTH / 2;
-	float v_0 = HEIGHT / 2;
-	// Focal length
-	float f = (WIDTH / 2) / (float) (tan((fov / 2) * PI / 180.0));
-	// Camera intrinsics Matrix
-	Mat K = (Mat_<float>(3, 3) << f, 0, u_0, 0, f, v_0, 0, 0, 1);
-	
-	// Render model
-	rendering(vertices, edges, theta_x, theta_y, theta_z, t_x, t_y, t_z, K);
-
-	return 0;
 }
 
 // Render function
@@ -152,12 +175,30 @@ void rendering(vector <Point3f>& vertices, vector <vector <int>>& edges, float t
 		// Pixel coordinates
 		Point2f tmp4((tmp3.x / tmp3.z), (tmp3.y / tmp3.z));
 		Point2i tmp5(tmp4);
+		// Clip pixel coordinates if smaller than zero
+		if (tmp5.x < 0)
+		{
+			tmp5.x = 0;
+		}
+		if (tmp5.y < 0)
+		{
+			tmp5.y = 0;
+		}
+		// Clip pixel coordinates if larger than image plane dimensions
+		if (tmp5.x >= WIDTH)
+		{
+			tmp5.x = WIDTH - 1;
+		}
+		if (tmp5.y >= HEIGHT)
+		{
+			tmp5.y = HEIGHT - 1;
+		}
 		vertices_camera.push_back(tmp5);
 		cout << vertices_camera[i] << endl;
 	}
 
 	// Draw vertices
-	for (int i = 0; i < vertices_camera.size() ; i++)
+	for (int i = 0; i < vertices_camera.size(); i++)
 	{
 		model.at<uchar>(vertices_camera[i].y, vertices_camera[i].x) = 0;
 	}
