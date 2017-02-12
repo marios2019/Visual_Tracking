@@ -144,7 +144,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="class_definitions\Camera.cpp" />
+    <ClCompile Include="class_definitions\Cuboid.cpp" />
     <ClCompile Include="Source.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="headers\3DShapes.h" />
+    <ClInclude Include="headers\camera-calibration.h" />
+    <ClInclude Include="headers\Camera.h" />
+    <ClInclude Include="headers\Cuboid.h" />
+    <ClInclude Include="headers\functionality.h" />
+    <ClInclude Include="headers\visual-tracking.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
