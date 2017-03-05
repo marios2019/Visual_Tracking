@@ -1,5 +1,2 @@
-﻿  Source.cpp
-d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\headers\functionality.h(351): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
-d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\headers\functionality.h(383): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
-  Visual_Tracking.vcxproj -> D:\MegaSync\ΜΕΠ\GitHub Repos\Visual_Tracking\Visual_Tracking\x64\Debug\Visual_Tracking.exe
-  Visual_Tracking.vcxproj -> D:\MegaSync\ΜΕΠ\GitHub Repos\Visual_Tracking\Visual_Tracking\x64\Debug\Visual_Tracking.pdb (Full PDB)
+﻿  Visual_Tracking.vcxproj -> C:\Users\marios\Documents\MEGAsync\ΜΕΠ\GitHub Repos\Visual_Tracking\Visual_Tracking\x64\Debug\Visual_Tracking.exe
+  Visual_Tracking.vcxproj -> C:\Users\marios\Documents\MEGAsync\ΜΕΠ\GitHub Repos\Visual_Tracking\Visual_Tracking\x64\Debug\Visual_Tracking.pdb (Full PDB)

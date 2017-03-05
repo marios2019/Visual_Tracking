@@ -160,3 +160,36 @@ Mat Camera::getExtrinsics() const
 	return E;
 }
 
+// Return the first derivative of the extrinsics matrix, with respect of the i-th extrinsic parameter.
+Mat Camera::getExtrinDerivative(int idx)
+{
+	if (idx > 5)
+	{
+		cout << "Invalid extrinsic camera parameter." << endl;
+		exit(EXIT_FAILURE);
+	}
+
+	Mat dE = (Mat_<float>(3, 4));
+
+	switch (idx)
+	{
+		case 0: // x = thetaX
+			break;
+
+		case 1: // x = thetaY
+			break;
+		
+		case 2: // x = thetaZ
+			break;
+
+		case 3: // x = tX
+			break;
+
+		case 4: // x = tY
+			break;
+		
+		case 5: // x = tZ
+			break;
+	}
+	return dE;
+}

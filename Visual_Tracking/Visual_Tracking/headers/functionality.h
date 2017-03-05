@@ -16,45 +16,37 @@
 using namespace cv;
 using namespace std;
 
-#include "Cuboid.h"
+#include "Cuboid3D.h"
 #include "Camera.h"
 
-// Functions declarations
+// Main functions declarations
 // Read model data from .x file
-void modelData(int, char**, float&, float&, float&);
+void modelData(float&, float&, float&);
 // Render function
-void rendering(Cuboid&, Camera&, Mat&, Mat&, string);
+Cuboid2D rendering(Cuboid2D&, Camera, Mat&, Mat&, string);
+// Dissimilarity between data and model object
+float dissimilarity(Cuboid3D&, Camera, Mat&, Mat);
+
+// Secondary functions declarations
+// Draw object on image planes
+void drawObj(Cuboid2D, Mat&, Mat&, string);
+// Object clipping
+void clipping(Cuboid2D&, int, int);
 // Check if a surface is being occluded by another one
 int occlusionSurf(vector <int>, vector <Point3f>, Point3f);
 // Returns the Euclidean norm of a 3D vector
 float norm2(Vec3f);
 // Returns the Euclidean norm of a 2D vector
 float norm2(Vec2f);
-// Dissimilarity between data and model object
-float dissimilarity(Cuboid&, Mat&, Mat);
 // Compute euclidean distance between two points
 float euclideanDistance(Point2i, Point2i);
 
-//Functions definitions
+// Main functions definitions
 // Read model data from .x file
-void modelData(int argc, char **argv, float &length, float &height, float &width)
+void modelData(float &length, float &height, float &width)
 {
 	
-	// Check if input .x file has been provided
-	if (argc < 2)
-	{
-		cout << "Provide input model file with .x extension." << endl;
-		system("PAUSE");
-		exit(EXIT_FAILURE);
-	}
-	// Check for too many arguments
-	if (argc > 2)
-	{
-		cout << "Provide only one input file." << endl;
-		system("PAUSE");
-		exit(EXIT_FAILURE);
-	}
-	ifstream file(argv[1]);
+	ifstream file("cuboid.x");
 	// Check if input is empty or the file is empty
 	if ((!file.is_open()) || (file.peek() == ifstream::traits_type::eof()))
 	{
@@ -64,7 +56,7 @@ void modelData(int argc, char **argv, float &length, float &height, float &width
 		exit(EXIT_FAILURE);
 	}
 	string line;
-	// Read cuboid dimensions from .x file
+	// Read Cuboid3D dimensions from .x file
 	while (getline(file, line))
 	{
 		size_t prev = 0;
@@ -101,12 +93,28 @@ void modelData(int argc, char **argv, float &length, float &height, float &width
 }
 
 // Render function
-void rendering(Cuboid &cuboid, Camera &camera, Mat &imagePlane, Mat &imagePlaneObj, string type)
+Cuboid2D rendering(Cuboid3D &Cuboid3D, Camera camera, Mat &imagePlane, Mat &imagePlaneObj, string type)
 {
 	// Initialization
+	Mat tmp(imagePlane.rows, imagePlane.cols, CV_8UC3, CV_RGB(255, 255, 255));
+	tmp.copyTo(imagePlaneObj);
+	if (!(type.compare("model")))
+	{
+		tmp.copyTo(imagePlane);
+	}
 	vector <int>::iterator iter1, iter2;
 	vector <int> edge, checkEdge;
-
+	vector <Point3f> homogeneousVertices;
+	vector <int> surface;
+	vector <Point2i> pointsPxl;
+	for (int i = 0; i < Cuboid3D.getEdgesSize(); i++)
+	{
+		Cuboid3D.setEdgeVisibility(i, false);
+	}
+	for (int i = 0; i < Cuboid3D.getSurfacesSize(); i++)
+	{
+		Cuboid3D.setSurfaceVisibility(i, false);
+	}
 	// Perspective projection matrix
 	Mat P = camera.getIntrinsics() * camera.getExtrinsics();
 
@@ -120,110 +128,418 @@ void rendering(Cuboid &cuboid, Camera &camera, Mat &imagePlane, Mat &imagePlaneO
 	cout << "\nGlobal coordinates <---> Pixel coordinates: " << endl;
 	cout << "-------------------------------------------" << endl;
 	vector <float> homogeneous;
-	for (int i = 0; i < cuboid.getVerticesSize(); i++)
+	for (int i = 0; i < Cuboid3D.getVerticesSize(); i++)
 	{
 		// Convert vertex coordinates to homogeneous coordinates
-		homogeneous.push_back(cuboid.getVertice(i).x);
-		homogeneous.push_back(cuboid.getVertice(i).y);
-		homogeneous.push_back(cuboid.getVertice(i).z);
+		homogeneous.push_back(Cuboid3D.getVertice(i).x);
+		homogeneous.push_back(Cuboid3D.getVertice(i).y);
+		homogeneous.push_back(Cuboid3D.getVertice(i).z);
 		homogeneous.push_back(1.f);
 
 		// Perspective projection
 		Mat tmp = P * Mat(homogeneous, false);
 		Point3f projection(tmp);
-
-		// Pixel coordinates
-		Point2f tmp2((projection.x / projection.z), (projection.y / projection.z));
-		Point2i pixelCoord(tmp2);
-		// Clip pixel coordinates if smaller than zero
-		if (pixelCoord.x < 0)
-		{
-			pixelCoord.x = 0;
-		}
-		if (pixelCoord.y < 0)
-		{
-			pixelCoord.y = 0;
-		}
-		// Clip pixel coordinates if larger than image plane dimensions
-		if (pixelCoord.x >= imagePlane.cols)
-		{
-			pixelCoord.x = imagePlane.cols - 1;
-		}
-		if (pixelCoord.y >= imagePlane.rows)
-		{
-			pixelCoord.y = imagePlane.rows - 1;
-		}
-		cuboid.setVerticePxl(pixelCoord, i);
-		cout << cuboid.getVertice(i) << "                " << cuboid.getVerticePxl(i) << endl;
+		homogeneousVertices.push_back(projection);
 		homogeneous.clear();
 	}
 
-	// Draw surfaces
+	// Create cuboid2d - projection of cuboid3d
+	Cuboid2D objProjection(homogeneousVertices);
+	homogeneousVertices.clear();
+	for (int i = 0; i < Cuboid3D.getVerticesSize(); i++)
+	{
+		cout << Cuboid3D.getVertice(i) << "                " << objProjection.getVerticePxl(i) << endl;
+	}
+
+	// Surface occlusion
 	cout << "\nAngle between camera direction and surface's normal:" << endl;
 	cout << "------------------------------------------------------" << endl;
-	vector <int> surface;
-	for (int i = 0; i < cuboid.getSurfacesSize(); i++)
+	for (int i = 0; i < Cuboid3D.getSurfacesSize(); i++)
 	{
 		cout << "Surface " << i << " -->";
-		// Draw if surface is not occluded
-		if (!occlusionSurf(cuboid.getSurface(i), cuboid.getVertices(), camera.getPosition()))
+		// Check if surface is not occluded
+		if (!occlusionSurf(Cuboid3D.getSurface(i), Cuboid3D.getVertices(), camera.getPosition()))
 		{
-			surface = cuboid.getSurface(i);
 			// Surface i is visible
-			cuboid.setSurfaceVisibility(i, true);
+			Cuboid3D.setSurfaceVisibility(i, true);
+			surface = Cuboid3D.getSurface(i);
+			objProjection.setSurface(surface);
 			for (int j = 0; j < surface.size(); j++)
 			{
 				// Egde j is visible
 				edge.push_back(surface[j]);
 				edge.push_back(surface[(j + 1) % surface.size()]);
-				for (int k = 0; k < cuboid.getEdgesSize(); k++)
+				for (int k = 0; k < Cuboid3D.getEdgesSize(); k++)
 				{
-					if (!(cuboid.getEdgeVisibility(k)))
+					if (!(Cuboid3D.getEdgeVisibility(k)))
 					{
-						checkEdge = cuboid.getEdge(k);
+						checkEdge = Cuboid3D.getEdge(k);
 						iter1 = find(checkEdge.begin(), checkEdge.end(), edge[0]);
 						iter2 = find(checkEdge.begin(), checkEdge.end(), edge[1]);
 						if ((iter1 != checkEdge.end()) && (iter2 != checkEdge.end()))
 						{
-							cuboid.setEdgeVisibility(k, true);
+							Cuboid3D.setEdgeVisibility(k, true);
+							pointsPxl.push_back(objProjection.getVerticePxl(edge[0]));
+							pointsPxl.push_back(objProjection.getVerticePxl(edge[1]));
+							objProjection.setEdge(pointsPxl);
 							checkEdge.clear();
+							pointsPxl.clear();
 							break;
 						}
 						checkEdge.clear();
 					}
-				}
-				// Draw edges
-				Point2i p1(cuboid.getVerticePxl(edge[0]));
-				Point2i p2(cuboid.getVerticePxl(edge[1]));
-				if (!(type.compare("model")))
-				{
-					// Draw vertices
-					imagePlane.at<uchar>(cuboid.getVerticePxl(edge[0]).y, cuboid.getVerticePxl(edge[1]).x) = (0, 0, 0);
-					line(imagePlane, p1, p2, CV_RGB(0, 0, 0), 1, CV_AA, 0);
-					line(imagePlaneObj, p1, p2, CV_RGB(0, 0, 0), 1, CV_AA, 0);
-				}
-				else if (!(type.compare("data")))
-				{
-					// Draw vertices
-					imagePlane.at<uchar>(cuboid.getVerticePxl(edge[0]).y, cuboid.getVerticePxl(edge[1]).x) = (0, 0, 255);
-					line(imagePlane, p1, p2, CV_RGB(255, 0, 0), 1, 8, 0);
-					line(imagePlaneObj, p1, p2, CV_RGB(255, 0, 0), 1, 8, 0);
 				}
 				edge.clear();
 			}
 			surface.clear();
 		}
 	}
+
+	// Object clipping
+	clipping(objProjection, imagePlane.rows, imagePlane.cols);
+
+	// Render object
+	drawObj(objProjection, imagePlane, imagePlaneObj, type);
+
 	// Display image plane object
 	string windowName = "Image Plane";
 	namedWindow(windowName, WINDOW_AUTOSIZE);
 	imshow(windowName, imagePlane);
 
 	// Display image plane object
-	windowName = "Cuboid " + type;
+	windowName = "Cuboid3D " + type;
 	namedWindow(windowName, WINDOW_AUTOSIZE);
 	imshow(windowName, imagePlaneObj);
+
+	cout << endl;
+
+	return objProjection;
 }
+
+// Dissimilarity between data and model object
+float dissimilarity(Cuboid2D &model, Camera virtualCam, Mat &imagePlane, Mat imagePlaneData)
+{
+	// Initialization
+	float offsetOut, offsetIn, normVec, normNormalVec;
+	float D = 0.f, mNum = 5, normalNum, pixelValue, maxValue;
+	vector <Point2i> edge;
+	Vec2f vec, normalOut, normalIn, normalVec, checkNormal;
+	Point2f vi, vj, p, tmp, pN, pC;
+	Point2i p_mi, pNormal, pCheck, intersection;
+	vector <Point2f> normalLine;
+	Vec3b pixel;
+	Rect rectangle(0, 0, imagePlane.cols, imagePlane.rows);
+	int length;
+	
+	for (int i = 0; i < model.getEdgesSize(); i++)
+	{
+		if (i == 0)
+		{
+			cout << "Edge segmentation and normals" << endl;
+			cout << "-----------------" << endl;
+		}
+
+		// Check if edge is visible
+		edge = model.getEdge(i);
+		// Compute equal distance points on each edge
+		cout << "Edge " << edge[0] << " --> " << edge[1];
+		vi = edge[0];
+		vj = edge[1];
+		vec = vj - vi;
+		normVec = norm2(vec);
+		cout << " edge length = " << normVec;
+		if (normVec > 0.f)
+		{
+			normVec = max(normVec, 0.0001f);
+			vec = vec / normVec;
+			// In and Out normal for each edge
+			normalOut.val[0] = -(vj.y - vi.y);
+			normalOut.val[1] = vj.x - vi.x;
+			normalOut = normalOut / max(norm2(normalOut), 0.0001f);
+			normalIn.val[0] = -(vi.y - vj.y);
+			normalIn.val[1] = vi.x - vj.x;
+			normalIn = normalIn / max(norm2(normalIn), 0.0001f);
+			cout << ", normalOut: " << normalOut << ", normalIn: " << normalIn << ", mi's:" << endl;
+			// For each mi on vivj edge compute normal vector and distance from data object
+			for (int j = 0; j < mNum; j++)
+			{
+				offsetOut = 10.f;
+				offsetIn = 10.f;
+				// Calculate mi on edge vivj
+				p = vec * ((float)j / (float)(mNum - 1)) * normVec;
+				p = vi + p;
+				p_mi = p;
+				cout << p_mi << " ";
+				// Draw Out normal from current mi
+				tmp.x = p_mi.x + offsetOut * normalOut.val[0];
+				tmp.y = p_mi.y + offsetOut * normalOut.val[1];
+				pNormal = tmp;
+				if (!(pNormal.inside(rectangle)))
+				{
+					checkNormal = (Point2f)(pNormal - p_mi);
+					normNormalVec = norm2(checkNormal);
+					length = (int)normNormalVec;
+					if (length > 0)
+					{
+						checkNormal = checkNormal / normNormalVec;
+						// Check if the whole egde is outside the image plane
+						for (int k = 0; k <= length; k++)
+						{
+							pC = checkNormal * ((float)k / (float)(length)) * normNormalVec;
+							pC = (Point2f)p_mi + pC;
+							pCheck = pC;
+							if (pCheck.inside(rectangle))
+							{
+								pNormal = pCheck;
+								offsetOut = k;
+								break;
+							}
+						}
+					}
+					else
+					{
+						pNormal = p_mi;
+					}
+				}
+				normalLine.push_back(pNormal);
+				arrowedLine(imagePlane, p_mi, pNormal, CV_RGB(0, 0, 0), 1, CV_AA, 0, 0.5);
+				
+				// Draw In normal from current mi
+				tmp.x = p_mi.x + offsetIn * normalIn.val[0];
+				tmp.y = p_mi.y + offsetIn * normalIn.val[1];
+				pNormal = tmp;
+				if (!(pNormal.inside(rectangle)))
+				{
+					checkNormal = (Point2f)(pNormal - p_mi);
+					normNormalVec = norm2(checkNormal);
+					length = (int)normNormalVec;
+					if (length > 0)
+					{
+						checkNormal = checkNormal / normNormalVec;
+						// Check if the whole egde is outside the image plane
+						for (int k = 0; k <= length; k++)
+						{
+							pC = checkNormal * ((float)k / (float)(length)) * normNormalVec;
+							pC = (Point2f)p_mi + pC;
+							pCheck = pC;
+							if (pCheck.inside(rectangle))
+							{
+								pNormal = pCheck;
+								offsetIn = k;
+								break;
+							}
+						}
+					}
+					else
+					{
+						pNormal = p_mi;
+					}
+				}
+				normalLine.push_back(pNormal);
+				arrowedLine(imagePlane, p_mi, pNormal, CV_RGB(0, 0, 0), 1, CV_AA, 0, 0.5);
+				circle(imagePlane, p_mi, 2, CV_RGB(0, 0, 0), -1, 8, 0);
+
+				// Calculate edge distance between model and data object
+				normalNum = offsetOut + offsetIn;
+				normalVec = normalLine[1] - normalLine[0];
+				normNormalVec = norm2(normalVec);
+				normalVec = normalVec / normNormalVec;
+				pixelValue = 0.f;
+				maxValue = 765;
+				for (int k = 0; k <= normalNum; k++)
+				{
+					pN = normalVec * ((float)k / (float)(normalNum)) * normNormalVec;
+					pN = normalLine[0] + pN;
+					pNormal = pN;
+					// Find the pixel with the smallest value
+					pixel = imagePlaneData.at<Vec3b>(pNormal);
+					pixelValue = pixel.val[0] + pixel.val[1] + pixel.val[2];
+					if (pixelValue < maxValue)
+					{
+						maxValue = pixelValue;
+						intersection = pNormal;
+					}
+				}
+				// Calculate euclidean distance between model and data edge
+				if (maxValue < 765)
+				{
+					circle(imagePlane, intersection, 2, CV_RGB(255, 0, 0), -1, 8, 0);
+					D += euclideanDistance(p_mi, intersection);
+				}
+				else
+				{
+					D += normalNum;
+				}
+				normalLine.clear();
+			}
+		}
+		cout << endl << endl;
+		edge.clear();
+	}
+
+	string window_name = "Model - Data dissimilarity";
+	namedWindow(window_name, WINDOW_AUTOSIZE);
+	imshow(window_name, imagePlane);
+
+	if (model.getEdgesSize() < 4)
+	{
+		D = 9999.f;
+	}
+
+	return D;
+}
+
+// Secondary functions declarations
+// Draw object on image planes
+void drawObj(Cuboid2D objProjection, Mat &imagePlane, Mat &imagePlaneObj, string type)
+{
+	vector <Point2i> edgePxl;
+	cout << "\nEdges to be rendered:" << endl;
+	cout << "-----------------------" << endl;
+	for (int i = 0; i < objProjection.getEdgesSize(); i++)
+	{
+		edgePxl = objProjection.getEdge(i);
+		Point2i p1(edgePxl[0]);
+		Point2i p2(edgePxl[1]);
+		cout << "Edge " << i << ": " << p1 << " --> " << p2 << endl;
+		if (!(type.compare("model")))
+		{
+			// Draw vertices
+			imagePlane.at<uchar>(p1.y, p1.x) = (0, 0, 0);
+			imagePlane.at<uchar>(p2.y, p2.x) = (0, 0, 0);
+			imagePlaneObj.at<uchar>(p1.y, p1.x) = (0, 0, 0);
+			imagePlaneObj.at<uchar>(p2.y, p2.x) = (0, 0, 0);
+			// Draw edges
+			line(imagePlane, p1, p2, CV_RGB(0, 0, 0), 1, CV_AA, 0);
+			line(imagePlaneObj, p1, p2, CV_RGB(0, 0, 0), 1, CV_AA, 0);
+		}
+		else if (!(type.compare("data")))
+		{
+			// Draw vertices
+			imagePlane.at<uchar>(p1.y, p1.x) = (0, 0, 255);
+			imagePlane.at<uchar>(p2.y, p2.x) = (0, 0, 255);
+			imagePlaneObj.at<uchar>(p1.y, p1.x) = (0, 0, 255);
+			imagePlaneObj.at<uchar>(p2.y, p2.x) = (0, 0, 255);
+			// Draw edges
+			line(imagePlane, p1, p2, CV_RGB(255, 0, 0), 1, 8, 0);
+			line(imagePlaneObj, p1, p2, CV_RGB(255, 0, 0), 1, 8, 0);
+		}
+		edgePxl.clear();
+	}
+}
+
+// Object clipping
+void clipping(Cuboid2D &obj, int height, int width)
+{
+	// Initialization
+	vector <Point2i> edgePxl, pointsPxl;
+	Vec2f edgeVec;
+	Point2f pE, p1, p2;
+	Point2i pEdge;
+	Rect rectangle(0, 0, width, height);
+	float normEdgeVec;
+	int length;
+
+	for (int i = ((int)obj.getEdgesSize() - 1); i >= 0; i--)
+	{
+		edgePxl = obj.getEdge(i);
+		p1 = edgePxl[0];
+		p2 = edgePxl[1];
+		// Check if one of the vertices of the edge is outside the image plane
+		if (!(p1.inside(rectangle)) || !(p2.inside(rectangle)))
+		{
+			edgeVec = p2 - p1;
+			normEdgeVec = norm2(edgeVec);
+			length = (int)normEdgeVec;
+			if (length > 0)
+			{
+				edgeVec = edgeVec / normEdgeVec;
+				// Check if the whole egde is outside the image plane
+				if (!(p1.inside(rectangle)) && !(p2.inside(rectangle)))
+				{					
+					for (int j = 0; j <= length; j++)
+					{
+						pE = edgeVec * ((float)j / (float)(length)) * normEdgeVec;
+						pE = p1 + pE;
+						pEdge = pE;
+						if (pEdge.inside(rectangle))
+						{
+							pointsPxl.push_back(pEdge);
+							break;
+						}
+					}
+					edgeVec = p1 - p2;
+					edgeVec = edgeVec / normEdgeVec;
+					for (int j = 0; j <= length; j++)
+					{
+						pE = edgeVec * ((float)j / (float)(length)) * normEdgeVec;
+						pE = p2 + pE;
+						pEdge = pE;
+						if (pEdge.inside(rectangle))
+						{
+							pointsPxl.push_back(pEdge);
+							break;
+						}
+					}
+					if (pointsPxl.empty())
+					{
+						obj.destroyEdge(i);
+					}
+					else
+					{
+						obj.setEdge(pointsPxl, i);
+					}
+				}
+				// Check if p1 edge's vertice is outside the image plane
+				else if (!(p1.inside(rectangle)))
+				{
+					for (int j = 0; j <= length; j++)
+					{
+						pE = edgeVec * ((float)j / (float)(length)) * normEdgeVec;
+						pE = p1 + pE;
+						pEdge = pE;
+						if (pEdge.inside(rectangle))
+						{
+							pointsPxl.push_back(pEdge);
+							pointsPxl.push_back((Point2i)p2);
+							break;
+						}
+					}
+					obj.setEdge(pointsPxl, i);
+				}
+				// Check if p2 edge's vertice is outside the image plane
+				else if (!(p2.inside(rectangle)))
+				{
+					edgeVec = p1 - p2;
+					edgeVec = edgeVec / normEdgeVec;
+					for (int j = 0; j <= length; j++)
+					{
+						pE = edgeVec * ((float)j / (float)(length)) * normEdgeVec;
+						pE = p2 + pE;
+						pEdge = pE;
+						if (pEdge.inside(rectangle))
+						{
+							pointsPxl.push_back((Point2i)p1);
+							pointsPxl.push_back(pEdge);
+							break;
+						}
+					}
+					obj.setEdge(pointsPxl, i);
+				}
+				pointsPxl.clear();
+			}
+			else
+			{
+				obj.destroyEdge(i);
+				//i = min(i, (int)obj.getEdgesSize());
+			}
+			edgePxl.clear();
+		}
+		
+	}
+		
+}
+
 
 // Check if a surface is being occluded by another one
 int occlusionSurf(vector <int> surface, vector <Point3f> vertices, Point3f t)
@@ -268,113 +584,6 @@ float norm2(Vec3f vec)
 float norm2(Vec2f vec)
 {
 	return sqrt(powf(vec.val[0], 2.f) + powf(vec.val[1], 2.f));
-}
-
-// Dissimilarity between data and model object
-float dissimilarity(Cuboid &model, Mat &imagePlane, Mat imagePlaneData)
-{
-	// Initialization
-	float offset = 10.f, normVec, normNormalVec;
-	float D = 0.f, mNum = 5, normalNum = 2 * offset, pixelValue, maxValue;
-	vector <int> edge, surface;
-	Vec2f vec, normalOut, normalIn, normalVec;
-	Point2f vi, vj, p, tmp, pN;
-	Point2i p_mi, pNormal, intersection;
-	vector <Point2f> normalLine;
-	Vec3b pixel;
-		
-	for (int i = 0; i < model.getEdgesSize(); i++)
-	{
-		if (i == 0)
-		{
-			cout << "Edge segmentation and normals" << endl;
-			cout << "-----------------" << endl;
-		}
-
-		// Check if edge is visible
-		edge = model.getEdge(i);
-		if (model.getEdgeVisibility(i))
-		{
-			// Compute equal distance points on each edge
-			cout << "Edge " << edge[0] << " --> " << edge[1];
-			vi = model.getVerticePxl(edge[0]);
-			vj = model.getVerticePxl(edge[1]);
-			vec = vj - vi;
-			normVec = norm2(vec);
-			cout << " edge length = " << normVec;
-			if (normVec > 0.f)
-			{
-				normVec = max(normVec, 0.0001f);
-				vec = vec / normVec;
-				// In and Out normal for each edge
-				normalOut.val[0] = -(vj.y - vi.y);
-				normalOut.val[1] = vj.x - vi.x;
-				normalOut = normalOut / max(norm2(normalOut), 0.0001f);
-				normalIn.val[0] = -(vi.y - vj.y);
-				normalIn.val[1] = vi.x - vj.x;
-				normalIn = normalIn / max(norm2(normalIn), 0.0001f);
-				cout << ", normalOut: " << normalOut << ", normalIn: " << normalIn << ", mi's:" << endl;
-				// For each mi on vivj edge compute normal vector and distance from data object
-				for (int j = 0; j < mNum; j++)
-				{
-					// Calculate mi on edge vivj
-					p = vec * ((float)j / (float)(mNum - 1)) * normVec;
-					p = vi + p;
-					p_mi = p;
-					cout << p_mi << " ";
-					// Draw Out normal from current mi
-					tmp.x = p_mi.x + offset * normalOut.val[0];
-					tmp.y = p_mi.y + offset * normalOut.val[1];
-					pNormal = tmp;
-					normalLine.push_back(pNormal);
-					arrowedLine(imagePlane, p_mi, pNormal, CV_RGB(0, 0, 0), 1, CV_AA, 0, 0.5);
-					// Draw In normal from current mi
-					tmp.x = p_mi.x + offset * normalIn.val[0];
-					tmp.y = p_mi.y + offset * normalIn.val[1];
-					pNormal = tmp;
-					normalLine.push_back(pNormal);
-					arrowedLine(imagePlane, p_mi, pNormal, CV_RGB(0, 0, 0), 1, CV_AA, 0, 0.5);
-					circle(imagePlane, p_mi, 2, CV_RGB(0, 0, 0), -1, 8, 0);
-
-					// Calculate edge distance between model and data object
-					normalVec = normalLine[1] - normalLine[0];
-					normNormalVec = norm2(normalVec);
-					normalVec = normalVec / normNormalVec;
-					maxValue = 765;
-					for (int k = 0; k < normalNum; k++)
-					{
-						pN = normalVec * ((float)k/ (float)(normalNum - 1)) * normNormalVec;		
-						pN = normalLine[0] + pN;
-						pNormal = pN;
-						// Find the pixel with the smallest value
-						pixel = imagePlaneData.at<Vec3b>(pNormal);
-						pixelValue = pixel.val[0] + pixel.val[1] + pixel.val[2];
-						if(pixelValue < maxValue)
-						{
-							maxValue = pixelValue;
-							intersection = pNormal;
-						}
-					}
-					// Calculate euclidean distance between model and data edge
-					if (maxValue < 765)
-					{
-						circle(imagePlane, intersection, 2, CV_RGB(255, 0, 0), -1, 8, 0);
-						D += euclideanDistance(p_mi, intersection);
-					}
-
-					normalLine.clear();
-				}
-			}
-			cout << endl << endl;
-		}
-		edge.clear();
-	}
-
-	string window_name = "Model - Data dissimilarity";
-	namedWindow(window_name, WINDOW_AUTOSIZE);
-	imshow(window_name, imagePlane);
-
-	return D;
 }
 
 // Compute euclidean distance between two points

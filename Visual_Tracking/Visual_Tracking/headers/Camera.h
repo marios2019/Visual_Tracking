@@ -46,6 +46,8 @@ public:
 	Mat getIntrinsics() const; // Return camera intrinsics matrix
 	Mat getExtrinsics() const; // Return camera extrinsics matrix
 	
+	Mat getExtrinDerivative(int); // Return the first derivative of the extrinsics matrix
+								  // with respect of the i-th extrinsic parameter.
 private:
 	// Camera Extrinsics
 	Vec3f t; // Camera position

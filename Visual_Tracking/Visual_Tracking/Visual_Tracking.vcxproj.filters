@@ -21,27 +21,33 @@
     <ClCompile Include="class_definitions\Camera.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="class_definitions\Cuboid.cpp">
+    <ClCompile Include="class_definitions\Cuboid3D.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="class_definitions\Cuboid2D.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="headers\3DShapes.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="headers\camera-calibration.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="headers\functionality.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="headers\visual-tracking.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="headers\Camera.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="headers\Cuboid.h">
+    <ClInclude Include="headers\projectiveGeometry.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\cameraCalibration.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\visualTracking.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\Cuboid3D.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\Cuboid2D.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
