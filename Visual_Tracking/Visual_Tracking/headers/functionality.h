@@ -39,7 +39,7 @@ float norm2(Vec3f);
 // Returns the Euclidean norm of a 2D vector
 float norm2(Vec2f);
 // Compute euclidean distance between two points
-float euclideanDistance(Point2i, Point2i);
+float euclideanDistanceSquared(Point2i, Point2i);
 
 // Main functions definitions
 // Read model data from .x file
@@ -221,7 +221,7 @@ float dissimilarity(Cuboid2D &model, Camera virtualCam, Mat &imagePlane, Mat ima
 {
 	// Initialization
 	float offsetOut, offsetIn, normVec, normNormalVec;
-	float D = 0.f, mNum = 5, normalNum, pixelValue, maxValue;
+	float D = 0.f, mNum = 7, normalNum, pixelValue, maxValue;
 	vector <Point2i> edge;
 	Vec2f vec, normalOut, normalIn, normalVec, checkNormal;
 	Point2f vi, vj, p, tmp, pN, pC;
@@ -261,7 +261,7 @@ float dissimilarity(Cuboid2D &model, Camera virtualCam, Mat &imagePlane, Mat ima
 			normalIn = normalIn / max(norm2(normalIn), 0.0001f);
 			cout << ", normalOut: " << normalOut << ", normalIn: " << normalIn << ", mi's:" << endl;
 			// For each mi on vivj edge compute normal vector and distance from data object
-			for (int j = 0; j < mNum; j++)
+			for (int j = 1; j < (mNum - 1); j++)
 			{
 				offsetOut = 10.f;
 				offsetIn = 10.f;
@@ -364,7 +364,7 @@ float dissimilarity(Cuboid2D &model, Camera virtualCam, Mat &imagePlane, Mat ima
 				if (maxValue < 765)
 				{
 					circle(imagePlane, intersection, 2, CV_RGB(255, 0, 0), -1, 8, 0);
-					D += euclideanDistance(p_mi, intersection);
+					D += euclideanDistanceSquared(p_mi, intersection);
 				}
 				else
 				{
@@ -421,8 +421,8 @@ void drawObj(Cuboid2D objProjection, Mat &imagePlane, Mat &imagePlaneObj, string
 			imagePlaneObj.at<uchar>(p1.y, p1.x) = (0, 0, 255);
 			imagePlaneObj.at<uchar>(p2.y, p2.x) = (0, 0, 255);
 			// Draw edges
-			line(imagePlane, p1, p2, CV_RGB(255, 0, 0), 1, 8, 0);
-			line(imagePlaneObj, p1, p2, CV_RGB(255, 0, 0), 1, 8, 0);
+			line(imagePlane, p1, p2, CV_RGB(255, 0, 0), 1, 4, 0);
+			line(imagePlaneObj, p1, p2, CV_RGB(255, 0, 0), 1, 4, 0);
 		}
 		edgePxl.clear();
 	}
@@ -531,7 +531,6 @@ void clipping(Cuboid2D &obj, int height, int width)
 			else
 			{
 				obj.destroyEdge(i);
-				//i = min(i, (int)obj.getEdgesSize());
 			}
 			edgePxl.clear();
 		}
@@ -587,7 +586,7 @@ float norm2(Vec2f vec)
 }
 
 // Compute euclidean distance between two points
-float euclideanDistance(Point2i p, Point2i q)
+float euclideanDistanceSquared(Point2i p, Point2i q)
 {
-	return sqrt(powf((q.x - p.x), 2.f) + powf((q.y - p.y), 2.f));
+	return (powf((q.x - p.x), 2.f) + powf((q.y - p.y), 2.f));
 }

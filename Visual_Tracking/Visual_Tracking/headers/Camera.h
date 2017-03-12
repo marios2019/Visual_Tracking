@@ -56,5 +56,7 @@ private:
 	Point2f principalPoint; // Principal point - center of image plane
 	float fov; // F.O.V
 	float focal; // Focal length
+	Vec3f getPositionDerivative(int); // Return the first derivative of the position vector t
+	Mat getRotationDerivative(int); // Return the first derivative of the rotation matrix R
 };
 

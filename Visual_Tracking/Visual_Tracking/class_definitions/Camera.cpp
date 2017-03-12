@@ -171,25 +171,64 @@ Mat Camera::getExtrinDerivative(int idx)
 
 	Mat dE = (Mat_<float>(3, 4));
 
+
+
+	return dE;
+}
+
+// Return the first derivative of the position vector t
+Vec3f Camera::getPositionDerivative(int idx)
+{
 	switch (idx)
 	{
-		case 0: // x = thetaX
-			break;
+		case 0: // x = tx
+			return Vec3f(1, 0, 0);
 
-		case 1: // x = thetaY
-			break;
-		
-		case 2: // x = thetaZ
-			break;
+		case 1: // x = ty
+			return Vec3f(0, 1, 0);
 
-		case 3: // x = tX
-			break;
+		case 2: // x = tz
+			return Vec3f(0, 0, 1);
 
-		case 4: // x = tY
-			break;
-		
-		case 5: // x = tZ
-			break;
+		case 3: // x = thetax
+			return Vec3f(0, 0, 0);
+
+		case 4: // x = thetay
+			return Vec3f(0, 0, 0);
+
+		case 5: // x = thetaz
+			return Vec3f(0, 0, 0);
 	}
-	return dE;
+}
+
+// Return the first derivative of the rotation matrix R
+Mat Camera::getRotationDerivative(int idx)
+{
+	switch (idx)
+	{
+		case 0: // x = tx
+			return (Mat_<float>(3, 3) << 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+		case 1: // x = ty
+			return (Mat_<float>(3, 3) << 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+		case 2: // x = tz
+			return (Mat_<float>(3, 3) << 0, 0, 0, 0, 0, 0, 0, 0, 0);
+
+		case 3: // x = thetax
+		{
+			Mat dRx = (Mat_<float>(3, 3) << 0, 0, 0, 0, -sin(thetaX), -cos(thetaX), 0, cos(thetaX), -sin(thetaX));
+			return (dRx * getRotationY() * getRotationZ());
+		}
+		case 4: // x = thetay
+		{
+			Mat dRy = (Mat_<float>(3, 3) << -sin(thetaY), 0, cos(thetaY), 0, 0, 0, -cos(thetaY), 0, -sin(thetaY));
+			return (getRotationX() * dRy * getRotationZ());
+		}
+		case 5: // x = thetaz
+		{
+			Mat dRz = (Mat_<float>(3, 3) << -sin(thetaZ), -cos(thetaZ), 0, cos(thetaZ), -sin(thetaZ), 0, 0, 0, 0);
+			return (getRotationX() * getRotationY() * dRz);
+		}
+	}
 }

@@ -24,12 +24,12 @@ Mat imagePlaneData(HEIGHT, WIDTH, CV_8UC3, CV_RGB(255, 255, 255));
 
 // Virtual camera initialization
 // Camera Extrinsics
-int txVirtual = 30;
-int tyVirtual = 30;
-int tzVirtual = 50;
-int rxVirtual = 36;
-int ryVirtual = 36;
-int rzVirtual = 36;
+int txVirtual = 2; // tx = -28
+int tyVirtual = 60; // ty = 30
+int tzVirtual = 50; // tz = 80
+int rxVirtual = 32; // rx = 160
+int ryVirtual = 30; // ry = -30
+int rzVirtual = 36; // rx = 0
 Vec3f tVirtual(0.f, 0.f, 80.f); // Camera position
 Vec3f rVirtual(180.f, 0.f, 0.f); // Rotations over x, y, z axes
 // Camera Intrinsics
@@ -39,12 +39,12 @@ float focalVirtual = (WIDTH / 2) / ((float)(tan((fovVirtual / 2) * PI / 180.0)))
 Camera virtualCam(tVirtual, rVirtual, Point2f(u0Virtual, v0Virtual), fovVirtual, focalVirtual);
 // Real camera initialization
 // Camera Extrinsics
-int txReal = 30;
-int tyReal = 30;
-int tzReal = 50;
-int rxReal = 36;
-int ryReal = 36;
-int rzReal = 36;
+int txReal = 4; // tx = -26
+int tyReal = 60; // ty = 30
+int tzReal = 50; // tz = 80
+int rxReal = 32; // rx = 160 
+int ryReal = 30; // ry = -30
+int rzReal = 36; // rz = 0
 Vec3f tReal(0.25f, 0.25f, 80.f); // Camera position
 Vec3f rReal(180.f, 0.f, 0.f); // Rotations over x, y, z axes
 // Camera Intrinsics
