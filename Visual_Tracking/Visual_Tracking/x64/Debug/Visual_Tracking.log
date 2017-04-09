@@ -1,13 +1,3 @@
 ﻿  Source.cpp
-d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\headers\functionality.h(294): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
-d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\headers\functionality.h(328): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
-d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\headers\functionality.h(356): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
-d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\headers\functionality.h(591): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
-  Cuboid3D.cpp
-  Cuboid2D.cpp
-  Camera.cpp
-  Generating Code...
-d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\class_definitions\camera.cpp(202): warning C4715: 'Camera::getPositionDerivative': not all control paths return a value
-d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\class_definitions\camera.cpp(234): warning C4715: 'Camera::getRotationDerivative': not all control paths return a value
   Visual_Tracking.vcxproj -> D:\MegaSync\ΜΕΠ\GitHub Repos\Visual_Tracking\Visual_Tracking\x64\Debug\Visual_Tracking.exe
   Visual_Tracking.vcxproj -> D:\MegaSync\ΜΕΠ\GitHub Repos\Visual_Tracking\Visual_Tracking\x64\Debug\Visual_Tracking.pdb (Full PDB)

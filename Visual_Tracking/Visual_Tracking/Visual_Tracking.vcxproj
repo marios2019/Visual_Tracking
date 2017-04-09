@@ -145,12 +145,16 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="class_definitions\Camera.cpp" />
+    <ClCompile Include="class_definitions\CameraStateSpace.cpp" />
     <ClCompile Include="class_definitions\Cuboid2D.cpp" />
     <ClCompile Include="class_definitions\Cuboid3D.cpp" />
+    <ClCompile Include="class_definitions\Distance.cpp" />
     <ClCompile Include="Source.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="headers\CameraStateSpace.h" />
     <ClInclude Include="headers\Cuboid2D.h" />
+    <ClInclude Include="headers\Distance.h" />
     <ClInclude Include="headers\projectiveGeometry.h" />
     <ClInclude Include="headers\cameraCalibration.h" />
     <ClInclude Include="headers\Camera.h" />

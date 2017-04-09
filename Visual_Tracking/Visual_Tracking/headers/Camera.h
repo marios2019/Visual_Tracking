@@ -7,27 +7,19 @@
 #include <iostream>
 #include <vector>
 
+#include "CameraStateSpace.h"
+
 #define PI 3.14159265f
 
 using namespace cv;
 using namespace std;
 
-class Camera
+class Camera: public CameraStateSpace
 {
 public:
 	Camera(); // Empty constructor
-	Camera(Vec3f, Vec3f, Point2f, float = 0.f, float = 0.f); // Constructor
+	Camera(Vec3f, Vec3f, Point2f, float = 0.f, float = 0.f, size_t = 0); // Constructor
 	~Camera(); // Destructor
-
-	void setPosition(Vec3f); // Change camera position
-	Vec3f getPosition() const; // Return camera position
-
-	void setThetaX(float); // Change x-axis rotation
-	void setThetaY(float); // Change y-axis rotation
-	void setThetaZ(float); // Change z-axis rotation
-	float getThetaX() const; // Return x-axis rotation
-	float getThetaY() const; // Return y-axis rotation
-	float getThetaZ() const; // Return x-axis rotation
 
 	void setPrincipal(Point2f); // Change principal point
 	Point2f getPrincipal() const; // Return principal point
@@ -46,12 +38,9 @@ public:
 	Mat getIntrinsics() const; // Return camera intrinsics matrix
 	Mat getExtrinsics() const; // Return camera extrinsics matrix
 	
-	Mat getExtrinDerivative(int); // Return the first derivative of the extrinsics matrix
+	Mat getExtrinsicsDerivative(int); // Return the first derivative of the extrinsics matrix
 								  // with respect of the i-th extrinsic parameter.
 private:
-	// Camera Extrinsics
-	Vec3f t; // Camera position
-	float thetaX, thetaY, thetaZ; // Camera rotation over x, y, z axes
 	// Camera Intrinsics
 	Point2f principalPoint; // Principal point - center of image plane
 	float fov; // F.O.V

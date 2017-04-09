@@ -27,6 +27,12 @@
     <ClCompile Include="class_definitions\Cuboid2D.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="class_definitions\Distance.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="class_definitions\CameraStateSpace.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="headers\functionality.h">
@@ -48,6 +54,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="headers\Cuboid2D.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\Distance.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\CameraStateSpace.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

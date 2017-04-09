@@ -1,27 +1,16 @@
 #include "..\headers\Camera.h"
 
-Camera::Camera() // Empty constructor
+Camera::Camera() : CameraStateSpace() // Empty constructor
 {
-	// Extrinsics initialization
-	t = Vec3f();
-	thetaX = 0.f;
-	thetaY = 0.f;
-	thetaZ = 0.f;
-
 	// Intrinsics initialization
 	principalPoint = Point2f();
 	fov = 0.f;
 	focal = 0.f;
 }
 
-Camera::Camera(Vec3f tVal, Vec3f rVal, Point2f principalVal, float fovVal, float focalVal) // Constructor
+Camera::Camera(Vec3f tVal, Vec3f rVal, Point2f principalVal, float fovVal, float focalVal, size_t paramsNumVal) // Constructor
+	: CameraStateSpace(tVal.val[0], tVal.val[1], tVal.val[2], rVal[0], rVal[1], rVal[2], paramsNumVal)
 {
-	// Extrinsics initialization
-	t = tVal;
-	thetaX = rVal.val[0] * PI / 180.f;
-	thetaY = rVal.val[1] * PI / 180.f;
-	thetaZ = rVal.val[2] * PI / 180.f;
-
 	// Intrinsics initialization
 	principalPoint = principalVal;
 	fov = fovVal;
@@ -30,54 +19,6 @@ Camera::Camera(Vec3f tVal, Vec3f rVal, Point2f principalVal, float fovVal, float
 
 Camera::~Camera()
 {
-}
-
-// Change camera position
-void Camera::setPosition(Vec3f tVal)
-{
-	t = tVal;
-}
-
-// Return camera position
-Vec3f Camera::getPosition() const
-{
-	return t;
-}
-
-// Change x-axis rotation
-void Camera::setThetaX(float thetaXVal)
-{
-	thetaX = thetaXVal * PI / 180.f;
-}
-
-// Change y-axis rotation
-void Camera::setThetaY(float thetaYVal)
-{
-	thetaY = thetaYVal * PI / 180.f;
-}
-
-// Change z-axis rotation
-void Camera::setThetaZ(float thetaZVal)
-{
-	thetaZ = thetaZVal * PI / 180.f;
-}
-
-// Return x-axis rotation
-float Camera::getThetaX() const
-{
-	return thetaX * 180.f / PI;
-}
-
-// Return y-axis rotation
-float Camera::getThetaY() const
-{
-	return thetaY * 180.f / PI;
-}
-
-// Return z-axis rotation
-float Camera::getThetaZ() const
-{
-	return thetaZ * 180.f / PI;
 }
 
 // Change principal point
@@ -119,19 +60,19 @@ float Camera::getFocal() const
 // Return x-axis rotation matrix
 Mat Camera::getRotationX() const
 {
-	return (Mat_<float>(3, 3) << 1, 0, 0, 0, cos(thetaX), -sin(thetaX), 0, sin(thetaX), cos(thetaX));
+	return (Mat_<float>(3, 3) << 1, 0, 0, 0, cos(getThetaX(RADIANS)), -sin(getThetaX(RADIANS)), 0, sin(getThetaX(RADIANS)), cos(getThetaX(RADIANS)));
 }
 
 // Return y-axis rotation matrix
 Mat Camera::getRotationY() const
 {
-	return (Mat_<float>(3, 3) << cos(thetaY), 0, sin(thetaY), 0, 1, 0, -sin(thetaY), 0, cos(thetaY));
+	return (Mat_<float>(3, 3) << cos(getThetaY(RADIANS)), 0, sin(getThetaY(RADIANS)), 0, 1, 0, -sin(getThetaY(RADIANS)), 0, cos(getThetaY(RADIANS)));
 }
 
 // Return z-axis rotation matrix
 Mat Camera::getRotationZ() const
 {
-	return (Mat_<float>(3, 3) << cos(thetaZ), -sin(thetaZ), 0, sin(thetaZ), cos(thetaZ), 0, 0, 0, 1);
+	return (Mat_<float>(3, 3) << cos(getThetaZ(RADIANS)), -sin(getThetaZ(RADIANS)), 0, sin(getThetaZ(RADIANS)), cos(getThetaZ(RADIANS)), 0, 0, 0, 1);
 }
 
 // Return x, y, z axes rotation matrix
@@ -152,7 +93,7 @@ Mat Camera::getExtrinsics() const
 	Mat Rt;
 	transpose(getRotation(), Rt);
 	// Trasnpose Rotation Matrix multiplied by vector T - camera position
-	Mat tmp = -Rt * Mat(t);
+	Mat tmp = -Rt * Mat(getPosition());
 	Vec3f RtT = Vec3f(tmp);
 	// Camera extrinsics
 	Mat E = (Mat_<float>(3, 4) << Rt.at<float>(0, 0), Rt.at<float>(0, 1), Rt.at<float>(0, 2), RtT[0], Rt.at<float>(1, 0), Rt.at<float>(1, 1), Rt.at<float>(1, 2), RtT[1], Rt.at<float>(2, 0), Rt.at<float>(2, 1), Rt.at<float>(2, 2), RtT[2]);
@@ -161,18 +102,24 @@ Mat Camera::getExtrinsics() const
 }
 
 // Return the first derivative of the extrinsics matrix, with respect of the i-th extrinsic parameter.
-Mat Camera::getExtrinDerivative(int idx)
+Mat Camera::getExtrinsicsDerivative(int idx)
 {
-	if (idx > 5)
+	if ((idx > 5) || (idx < 0))
 	{
 		cout << "Invalid extrinsic camera parameter." << endl;
 		exit(EXIT_FAILURE);
 	}
 
-	Mat dE = (Mat_<float>(3, 4));
-
-
-
+	// Inverse Rotation Matrix derivative
+	Mat dR, Rt, dRt;
+	transpose(getRotationDerivative(idx), dRt);
+	transpose(getRotation(), Rt);
+	// Trasnpose Rotation Matrix multiplied by vector T - camera position derivative
+	Mat tmp = - (dRt * Mat(getPosition(), false)) - (Rt * Mat(getPositionDerivative(idx)));
+	Vec3f dRtT = Vec3f(tmp);
+	// Camera extrinsics derivative
+	Mat dE = (Mat_<float>(3, 4) << dRt.at<float>(0, 0), dRt.at<float>(0, 1), dRt.at<float>(0, 2), dRtT[0], dRt.at<float>(1, 0), dRt.at<float>(1, 1), dRt.at<float>(1, 2), dRtT[1], dRt.at<float>(2, 0), dRt.at<float>(2, 1), dRt.at<float>(2, 2), dRtT[2]);
+	
 	return dE;
 }
 
@@ -198,6 +145,9 @@ Vec3f Camera::getPositionDerivative(int idx)
 
 		case 5: // x = thetaz
 			return Vec3f(0, 0, 0);
+
+		default:
+			return Vec3f();
 	}
 }
 
@@ -217,18 +167,21 @@ Mat Camera::getRotationDerivative(int idx)
 
 		case 3: // x = thetax
 		{
-			Mat dRx = (Mat_<float>(3, 3) << 0, 0, 0, 0, -sin(thetaX), -cos(thetaX), 0, cos(thetaX), -sin(thetaX));
+			Mat dRx = (Mat_<float>(3, 3) << 0, 0, 0, 0, -sin(getThetaX(RADIANS)), -cos(getThetaX(RADIANS)), 0, cos(getThetaX(RADIANS)), -sin(getThetaX(RADIANS)));
 			return (dRx * getRotationY() * getRotationZ());
 		}
 		case 4: // x = thetay
 		{
-			Mat dRy = (Mat_<float>(3, 3) << -sin(thetaY), 0, cos(thetaY), 0, 0, 0, -cos(thetaY), 0, -sin(thetaY));
+			Mat dRy = (Mat_<float>(3, 3) << -sin(getThetaY(RADIANS)), 0, cos(getThetaY(RADIANS)), 0, 0, 0, -cos(getThetaY(RADIANS)), 0, -sin(getThetaY(RADIANS)));
 			return (getRotationX() * dRy * getRotationZ());
 		}
 		case 5: // x = thetaz
 		{
-			Mat dRz = (Mat_<float>(3, 3) << -sin(thetaZ), -cos(thetaZ), 0, cos(thetaZ), -sin(thetaZ), 0, 0, 0, 0);
+			Mat dRz = (Mat_<float>(3, 3) << -sin(getThetaZ(RADIANS)), -cos(getThetaZ(RADIANS)), 0, cos(getThetaZ(RADIANS)), -sin(getThetaZ(RADIANS)), 0, 0, 0, 0);
 			return (getRotationX() * getRotationY() * dRz);
 		}
+
+		default:
+			return Mat();
 	}
 }

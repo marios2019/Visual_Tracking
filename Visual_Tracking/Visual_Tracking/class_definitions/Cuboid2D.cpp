@@ -42,7 +42,9 @@ Cuboid2D::~Cuboid2D()
 Point3f Cuboid2D::getHomogeneousVertice(int idx)
 {
 	// Check if idx is between 0..VERTICES=8
-	return homogeneousVertices[checkIdx(idx, VERTICES)];
+	checkIdx(idx, VERTICES);
+
+	return homogeneousVertices[idx];
 }
 
 // Returns a vector of Cuboid2D vertices
@@ -58,13 +60,13 @@ int Cuboid2D::getHomogeneousVerticesSize() const
 }
 
 // Set edge to be rendered
-void Cuboid2D::setEdge(vector <Point2i> edgeVal)
+void Cuboid2D::setEdge(vector <Point2f> edgeVal)
 {
 	edges.push_back(edgeVal);
 }
 
 // Change edge[idx] value
-void Cuboid2D::setEdge(vector <Point2i> edge, int idx)
+void Cuboid2D::setEdge(vector <Point2f> edge, int idx)
 {
 	// Check if idx is valid
 	checkIdx(idx, (int)edges.size());
@@ -82,7 +84,7 @@ void Cuboid2D::destroyEdge(int idx)
 }
 
 // Returns an edge of the Cuboid2D
-vector <Point2i> Cuboid2D::getEdge(int idx)
+vector <Point2f> Cuboid2D::getEdge(int idx)
 {
 	// Check if idx is valid
 	checkIdx(idx, (int) edges.size());
@@ -91,7 +93,7 @@ vector <Point2i> Cuboid2D::getEdge(int idx)
 }
 
 // Returns a vector of Cuboid2D edges
-vector <vector <Point2i>> Cuboid2D::getEdges() const
+vector <vector <Point2f>> Cuboid2D::getEdges() const
 {
 	return edges;
 }
@@ -129,27 +131,23 @@ size_t Cuboid2D::getSurfacesSize() const
 	return surfaces.size();
 }
 
-
 // Change verticesPixel vector
-void Cuboid2D::setVerticesPxl(vector <Point2i> verticesPixelVal)
+void Cuboid2D::setVerticesPxl(vector <Point2f> verticesPixelVal)
 {
 	verticesPixel = verticesPixelVal;
 }
 
-// Change verticePixel[idx] value
-void Cuboid2D::setVerticePxl(int idx, Point2i verticePixelVal)
+// Change vertexPixel[idx] value
+void Cuboid2D::setVertexPxl(int idx, Point2f verticePixelVal)
 {
-	if ((idx < 0) || (idx >= getVerticesPxlSize()))
-	{
-		cout << "Invalid memory access." << endl;
-		return;
-	}
+	// Check if idx is valid
+	checkIdx(idx, verticesPixel.size());
 
 	verticesPixel[idx] = verticePixelVal;
 }
 
-// Returns a vertice of the Cuboid2D, in pixel coordinates 
-Point2i Cuboid2D::getVerticePxl(int idx)
+// Returns a vertex of the Cuboid2D, in pixel coordinates 
+Point2f Cuboid2D::getVertexPxl(int idx)
 {
 	// Check if idx is valid
 	checkIdx(idx, verticesPixel.size());
@@ -158,7 +156,7 @@ Point2i Cuboid2D::getVerticePxl(int idx)
 }
 
 // Returns a vector of Cuboid2D vertices, in pixel coordinates
-vector <Point2i> Cuboid2D::getVerticesPxl() const
+vector <Point2f> Cuboid2D::getVerticesPxl() const
 {
 	return verticesPixel;
 }
