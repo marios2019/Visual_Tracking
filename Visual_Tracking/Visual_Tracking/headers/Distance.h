@@ -60,7 +60,7 @@ private:
 	vector <Point2f> mijDerivatives; // edge's subintervals derivatives of the cuboid2d
 	vector <float> errors; // distances between model and data object edges, from mij points to model edges to normal intersection at data edges - sij
 	vector <float> errorsDeriv; // distances derivatives between model and data object edges, from mij points to model edges to normal intersection at data edges - sij
-	int mijNum; // number of subintervals on each
+	int mijNum; // number of subintervals on each edge
 
 	void setPxlDeriv(Point3f, Point3f); // Set vertex derivative of the cuboid2d, in pixel coordinates
 	void checkIdx(int, size_t); // Check for invalid memory access

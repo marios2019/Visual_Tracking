@@ -9,7 +9,7 @@ Camera::Camera() : CameraStateSpace() // Empty constructor
 }
 
 Camera::Camera(Vec3f tVal, Vec3f rVal, Point2f principalVal, float fovVal, float focalVal, size_t paramsNumVal) // Constructor
-	: CameraStateSpace(tVal.val[0], tVal.val[1], tVal.val[2], rVal[0], rVal[1], rVal[2], paramsNumVal)
+	: CameraStateSpace(tVal.val[0], tVal.val[1], tVal.val[2], rVal[0], rVal[1], rVal[2], (int) paramsNumVal)
 {
 	// Intrinsics initialization
 	principalPoint = principalVal;

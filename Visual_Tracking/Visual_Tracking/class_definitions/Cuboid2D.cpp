@@ -23,7 +23,7 @@ Cuboid2D::Cuboid2D(vector <Point3f> homoVerticesVal)
 
 	// VerticesPixel and verticesVisibility initialization
 	Point2f tmp;
-	Point2i verticePixel;
+	Point2f verticePixel;
 	for (int i = 0; i < homogeneousVertices.size(); i++)
 	{
 		tmp.x = homogeneousVertices[i].x / homogeneousVertices[i].z;

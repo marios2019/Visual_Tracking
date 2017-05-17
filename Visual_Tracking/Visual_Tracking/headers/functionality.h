@@ -27,6 +27,9 @@ using namespace std;
 #define RY 30
 #define RZ 0
 
+// Number of mijs
+#define MNUM 3
+
 //#define F_DEBUG
 
 // Main functions declarations
@@ -38,7 +41,7 @@ Cuboid2D rendering(Cuboid3D&, Camera, Mat&, Mat&, string);
 // Render function model
 Cuboid2D rendering(Cuboid3D&, Camera, Mat&, Mat&, vector <Distance>&, string);
 // Dissimilarity between data and model object
-void dissimilarity(Cuboid2D&, Camera, Mat&, Mat, vector <Distance>&);
+void dissimilarity(Cuboid2D&, Camera, Mat&, Mat, vector <Distance>&, int);
 
 // Secondary functions declarations
 // Draw object on image planes
@@ -54,7 +57,7 @@ float norm2(Vec2f);
 // Compute euclidean distance between two points
 float euclideanDistanceSquared(Point2i, Point2i);
 // Keys pressed handler - case sensitive
-void keyboardHandler(Camera&, Camera&, bool&, bool&, bool&);
+void keyboardHandler(Camera&, Camera&, Cuboid3D&, Cuboid3D&, int&, vector <State>&, bool&, bool&, bool&);
 
 // Main functions definitions
 // Visual tracker main function
@@ -65,8 +68,9 @@ void visualTracker(Cuboid3D& model, Cuboid3D& Data, int WIDTH, int HEIGHT)
 	bool fitFlag = false; // If true start non linear fitting
 	int iterations = 0; // Number of non linear fitting iterations
 	float squareDiff = 0.f; // Square difference between xi+1 and xi state parameters
-	vector <State> state = { X, Y, Z, THETAX, THETAY };
+	vector <State> state = { X, Y, Z, THETAX, THETAY, THETAZ };
 	Mat Jglobal, Eglobal;
+	int mNum = MNUM; // Number of mij intervals
 
 	// Image plane WIDTHxHEIGHT pixels
 	Mat imagePlane(HEIGHT, WIDTH, CV_8UC3, CV_RGB(255, 255, 255));
@@ -107,7 +111,7 @@ void visualTracker(Cuboid3D& model, Cuboid3D& Data, int WIDTH, int HEIGHT)
 			// Render data
 			Cuboid2D dataProjection(rendering(Data, realCam, imagePlane, imagePlaneData, "data"));
 			// Disimillarity between data and model object
-			dissimilarity(modelProjection, virtualCam, imagePlane, imagePlaneData, distances);
+			dissimilarity(modelProjection, virtualCam, imagePlane, imagePlaneData, distances, mNum);
 
 			// Display camera parameters
 			Mat virtualValues(70, 400, CV_8UC3, Scalar::all(255));
@@ -135,24 +139,27 @@ void visualTracker(Cuboid3D& model, Cuboid3D& Data, int WIDTH, int HEIGHT)
 			// Errors vector
 			vector <float> errors;
 			errors = distances[0].getErrors();
-			Mat E = Mat((int)errors.size(), 1, CV_32FC1);
-			memcpy(E.data, errors.data(), errors.size() * sizeof(float));
-			E.copyTo(Eglobal);
-			// Jacobian of errors vector for each state parameter
-			vector <vector <float>> Jacobian;
-			for (int i = 0; i < distances.size(); i++)
+			if (!errors.empty())
 			{
-				Jacobian.push_back(distances[i].getErrorsDeriv());
+				Mat E = Mat((int)errors.size(), 1, CV_32FC1);
+				memcpy(E.data, errors.data(), errors.size() * sizeof(float));
+				E.copyTo(Eglobal);
+				// Jacobian of errors vector for each state parameter
+				vector <vector <float>> Jacobian;
+				for (int i = 0; i < distances.size(); i++)
+				{
+					Jacobian.push_back(distances[i].getErrorsDeriv());
+				}
+				Mat J = Mat((int)Jacobian[0].size(), (int)Jacobian.size(), CV_32FC1);
+				for (int i = 0; i < Jacobian.size(); i++)
+				{
+					Mat Ji = Mat((int)Jacobian[i].size(), 1, CV_32FC1);
+					memcpy(Ji.data, Jacobian[i].data(), Jacobian[i].size() * sizeof(float));
+					Ji.col(0).copyTo(J.col(i));
+				}
+				J.copyTo(Jglobal);
+				cout << "Dissimilarity between model and data object: " << E.dot(E) << endl;
 			}
-			Mat J = Mat((int)Jacobian[0].size(), (int)Jacobian.size(), CV_32FC1);
-			for (int i = 0; i < Jacobian.size(); i++)
-			{
-				Mat Ji = Mat((int)Jacobian[i].size(), 1, CV_32FC1);
-				memcpy(Ji.data, Jacobian[i].data(), Jacobian[i].size() * sizeof(float));
-				Ji.col(0).copyTo(J.col(i));
-			}
-			J.copyTo(Jglobal);
-			cout << "Dissimilarity between model and data object: " << E.dot(E) << endl;
 		}
 		// Non linear fitting - Gauss Newton
 		if (fitFlag)
@@ -177,7 +184,7 @@ void visualTracker(Cuboid3D& model, Cuboid3D& Data, int WIDTH, int HEIGHT)
 			++iterations;
 			squareDiff = (float) abs(xNew.dot(xNew) - x.dot(x));
 			// Iterations limit
-			if (iterations == 100)
+			if (iterations == 10)
 			{
 				cout << "Number of iterations: " << iterations << ", state parameters: ";
 				for (int i = 0; i < virtualCam.getParamsNum(); i++)
@@ -192,7 +199,7 @@ void visualTracker(Cuboid3D& model, Cuboid3D& Data, int WIDTH, int HEIGHT)
 		else
 		{
 			// Keys pressed handler
-			keyboardHandler(virtualCam, realCam, exitFlag, updateFlag, fitFlag);
+			keyboardHandler(virtualCam, realCam, model, Data, mNum, state, exitFlag, updateFlag, fitFlag);
 		}
 	}
 }
@@ -304,7 +311,7 @@ Cuboid2D rendering(Cuboid3D &Cuboid3D, Camera camera, Mat &imagePlane, Mat &imag
 #ifdef F_DEBUG
 	for (int i = 0; i < Cuboid3D.getVerticesSize(); i++)
 	{
-		cout << Cuboid3D.getVertice(i) << "                " << objProjection.getVerticePxl(i) << endl;
+		cout << Cuboid3D.getVertice(i) << "                " << objProjection.getVertexPxl(i) << endl;
 	}
 #endif
 	// Surface occlusion
@@ -323,7 +330,10 @@ Cuboid2D rendering(Cuboid3D &Cuboid3D, Camera camera, Mat &imagePlane, Mat &imag
 			// Surface i is visible
 			Cuboid3D.setSurfaceVisibility(i, true);
 			surface = Cuboid3D.getSurface(i);
-			objProjection.setSurface(surface);
+			if (Cuboid3D.getSurfaceVisibility(i))
+			{
+				objProjection.setSurface(surface);
+			}
 			for (int j = 0; j < surface.size(); j++)
 			{
 				// Egde j is visible
@@ -339,12 +349,15 @@ Cuboid2D rendering(Cuboid3D &Cuboid3D, Camera camera, Mat &imagePlane, Mat &imag
 						if ((iter1 != checkEdge.end()) && (iter2 != checkEdge.end()))
 						{
 							Cuboid3D.setEdgeVisibility(k, true);
-							pointsPxl.push_back(objProjection.getVertexPxl(edge[0]));
-							pointsPxl.push_back(objProjection.getVertexPxl(edge[1]));
-							objProjection.setEdge(pointsPxl);
-							checkEdge.clear();
-							pointsPxl.clear();
-							break;
+							if (Cuboid3D.getEdgeVisibility(k))
+							{
+								pointsPxl.push_back(objProjection.getVertexPxl(edge[0]));
+								pointsPxl.push_back(objProjection.getVertexPxl(edge[1]));
+								objProjection.setEdge(pointsPxl);
+								checkEdge.clear();
+								pointsPxl.clear();
+								break;
+							}
 						}
 						checkEdge.clear();
 					}
@@ -441,7 +454,7 @@ Cuboid2D rendering(Cuboid3D &Cuboid3D, Camera camera, Mat &imagePlane, Mat &imag
 #ifdef F_DEBUG
 	for (int i = 0; i < Cuboid3D.getVerticesSize(); i++)
 	{
-		cout << Cuboid3D.getVertice(i) << "                " << objProjection.getVerticePxl(i) << endl;
+		cout << Cuboid3D.getVertice(i) << "                " << objProjection.getVertexPxl(i) << endl;
 	}
 #endif
 
@@ -461,7 +474,10 @@ Cuboid2D rendering(Cuboid3D &Cuboid3D, Camera camera, Mat &imagePlane, Mat &imag
 			// Surface i is visible
 			Cuboid3D.setSurfaceVisibility(i, true);
 			surface = Cuboid3D.getSurface(i);
-			objProjection.setSurface(surface);
+			if (Cuboid3D.getSurfaceVisibility(i))
+			{
+				objProjection.setSurface(surface);
+			}
 			for (int j = 0; j < surface.size(); j++)
 			{
 				// Egde j is visible
@@ -477,20 +493,23 @@ Cuboid2D rendering(Cuboid3D &Cuboid3D, Camera camera, Mat &imagePlane, Mat &imag
 						if ((iter1 != checkEdge.end()) && (iter2 != checkEdge.end()))
 						{
 							Cuboid3D.setEdgeVisibility(k, true);
-							pointsPxl.push_back(objProjection.getVertexPxl(edge[0]));
-							pointsPxl.push_back(objProjection.getVertexPxl(edge[1]));
-							objProjection.setEdge(pointsPxl);
-							// Edges derivatives
-							for (int s = 0; s < distances.size(); s++)
+							if (Cuboid3D.getEdgeVisibility(k))
 							{
-								vector <Point2f> edgeDerivative;
-								edgeDerivative.push_back(distances[s].getPxlDeriv(edge[0]));
-								edgeDerivative.push_back(distances[s].getPxlDeriv(edge[1]));
-								distances[s].setEdgeDeriv(edgeDerivative);
+								pointsPxl.push_back(objProjection.getVertexPxl(edge[0]));
+								pointsPxl.push_back(objProjection.getVertexPxl(edge[1]));
+								objProjection.setEdge(pointsPxl);
+								// Edges derivatives
+								for (int s = 0; s < distances.size(); s++)
+								{
+									vector <Point2f> edgeDerivative;
+									edgeDerivative.push_back(distances[s].getPxlDeriv(edge[0]));
+									edgeDerivative.push_back(distances[s].getPxlDeriv(edge[1]));
+									distances[s].setEdgeDeriv(edgeDerivative);
+								}
+								checkEdge.clear();
+								pointsPxl.clear();
+								break;
 							}
-							checkEdge.clear();
-							pointsPxl.clear();
-							break;
 						}
 						checkEdge.clear();
 					}
@@ -524,12 +543,11 @@ Cuboid2D rendering(Cuboid3D &Cuboid3D, Camera camera, Mat &imagePlane, Mat &imag
 }
 
 // Dissimilarity between data and model object
-void dissimilarity(Cuboid2D &model, Camera virtualCam, Mat &imagePlane, Mat imagePlaneData, vector <Distance> &distances)
+void dissimilarity(Cuboid2D &model, Camera virtualCam, Mat &imagePlane, Mat imagePlaneData, vector <Distance> &distances, int mNum)
 {
 	// Initialization
 	float offsetOut, offsetIn, normVec, normNormalVec;
 	float normalOffset, maxValue = 765;
-	int mNum = 7;
 	Vec2f vec, normalOut, normalIn, normalVec, checkNormal;
 	Point2f  vi, vj, p, tmp, pN, pC, p_mi, pNormal, pCheck, intersection;
 	vector <Point2f> normalLine, edge;
@@ -685,6 +703,7 @@ void dissimilarity(Cuboid2D &model, Camera virtualCam, Mat &imagePlane, Mat imag
 				// Calculate euclidean distance between model and data edge
 				if (sijPoints.size() > 0)
 				{
+					// Intersection is found
 					// Find exact sij point on the data edge - weighted average
 					float weightsSum = 0.f;
 					for (int k = 0; k < sijPoints.size(); k++)
@@ -714,18 +733,25 @@ void dissimilarity(Cuboid2D &model, Camera virtualCam, Mat &imagePlane, Mat imag
 				else
 				{
 					// Assign mij, calculate mij derivatives, assign dij and calculate dij derivatives
+					// Intersection not found
 					for (int s = 0; s < distances.size(); s++)
 					{
 						distances[s].setInterval(p_mi);
-						Point2f dp_mi, dsij = Point2f(0.f, 0.f);
-						Vec2f dvec, dij, ddij;
+						float lambda = offsetOut;
+						Point2f dp_mi;
+						Vec2f dvec, dij, ddij, dnormal, dnorm, normal;
+						normal = normalOut;
 						dvec = distances[s].getEdgeDeriv(i)[1] - distances[s].getEdgeDeriv(i)[0];
 						dp_mi = ((float)j / (float)(mNum - 1)) * dvec;
 						dp_mi += distances[s].getEdgeDeriv(i)[0];
 						distances[s].setIntervalDeriv(dp_mi);
-						dij.val[0] = 10.f;
-						dij.val[1] = 0.f;
-						ddij = dsij - dp_mi;
+						dij.val[0] = p_mi.x + lambda * normal.val[0];
+						dij.val[1] = p_mi.y + lambda * normal.val[1];
+						dnormal.val[0] = -dvec.val[1];
+						dnormal.val[1] = dvec.val[0];
+						dnorm = 0.5f * powf(vec.dot(vec), 0.5f) * dnormal;
+						divide(dnormal, dnorm, dnormal);
+						add((Vec2f)dp_mi, lambda*dnormal, ddij);
 						distances[s].setError(dij);
 						distances[s].setErrorDeriv(ddij);
 					}
@@ -954,8 +980,9 @@ float euclideanDistanceSquared(Point2i p, Point2i q)
 }
 
 // Keys pressed handler - case sensitive
-void keyboardHandler(Camera &virtualCam, Camera &realCam, bool &exitFlag, bool &updateFlag, bool &fitFlag)
+void keyboardHandler(Camera &virtualCam, Camera &realCam, Cuboid3D &model, Cuboid3D &Data, int &mNum, vector <State>& state, bool &exitFlag, bool &updateFlag, bool &fitFlag)
 {
+	static int primitives = 0, surface = 0, edge = 0;
 
 	switch (waitKey(0))
 	{
@@ -1147,12 +1174,91 @@ void keyboardHandler(Camera &virtualCam, Camera &realCam, bool &exitFlag, bool &
 		case 32: // SPACE key pressed - set camera to default extrinsic parameters
 		{
 			vector <float> params = { TX, TY, TZ, RX, RY, RZ };
-			vector <State> state = { X, Y, Z, THETAX, THETAY, THETAZ };
-			virtualCam.setParams(params, state);
+			vector <State> defaultState = { X, Y, Z, THETAX, THETAY, THETAZ };
+			virtualCam.setParams(params, defaultState);
 			params[0] += 2.f;
-			realCam.setParams(params, state);
+			realCam.setParams(params, defaultState);
 			updateFlag = true;
 			break;
+		}
+		case 9: // TAB key pressed - choose primitives to be rendered
+		{
+			primitives = (primitives + 1) % 3;
+			model.setPrimitives(primitives);
+			Data.setPrimitives(primitives);
+			if (primitives == 0)
+			{
+				mNum = MNUM;
+			}
+			else if ((primitives == 1) && (mNum < 5))
+			{
+				mNum = 5;
+			}
+			else if ((primitives == 2) && (mNum < 7))
+			{
+				mNum = 7;
+			}
+			updateFlag = true;
+			break;
+		}
+		case 45: // - key pressed - choose egde or surface to be rendered
+		{
+			if (primitives == 1) // surfaces
+			{
+				surface = (surface - 1) % 6;
+				model.setSurfacesRendered(surface);
+				Data.setSurfacesRendered(surface);
+				model.setEdgesRendered();
+				Data.setEdgesRendered();
+			}
+			else if (primitives == 2) // edges
+			{
+				edge = (edge - 1) % 12;
+				model.setSurfacesRendered();
+				Data.setSurfacesRendered();
+				model.setEdgesRendered(edge);
+				Data.setEdgesRendered(edge);
+			}
+			updateFlag = true;
+			break;
+		}
+		case 61: // = key pressed - choose egde or surface to be rendered
+		{
+			if (primitives == 1) // surfaces
+			{
+				surface = (surface + 1) % 6;
+				model.setSurfacesRendered(surface);
+				Data.setSurfacesRendered(surface);
+				model.setEdgesRendered();
+				Data.setEdgesRendered();
+			}
+			else if (primitives == 2) // edges
+			{
+				edge = (edge + 1) % 12;
+				model.setSurfacesRendered();
+				Data.setSurfacesRendered();
+				model.setEdgesRendered(edge);
+				Data.setEdgesRendered(edge);
+			}
+			updateFlag = true;
+			break;
+		}
+		case 126: // ` key pressed - choose number of camera parameters
+		{
+			int numParams, parameters;
+			vector <State> tmpStates;
+			cout << "Choose number of camera parameters: ";
+			cin >> numParams;
+			cout << "\n Choose which camera parameters: ";
+			for (int i = 0; i < numParams; i++)
+			{
+				cin >> parameters;
+				tmpStates.push_back((State)parameters);
+			}
+			sort(tmpStates.begin(), tmpStates.end());
+			state.clear();
+			state = tmpStates;			
+			virtualCam.setParamsNum(numParams);
 		}
 		default:
 		{

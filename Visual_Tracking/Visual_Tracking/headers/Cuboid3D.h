@@ -54,12 +54,20 @@ public:
 	void setSurfaceVisibility(int, bool); // Change the surface visibility
 	bool getSurfaceVisibility(int); // Returns the surface visibility
 	vector <bool> getSurfacesVisibility() const; // Returns the vector of surfaces visibility
-	
+
+	void setEdgesRendered(); // Set which edges will be rendered
+	void setEdgesRendered(int); // Set which edges will be rendered
+	void setSurfacesRendered(); // Set which surface will be rendered
+	void setSurfacesRendered(int); // Set which surface will be rendered
+	void setPrimitives(int); // Set which type of primitives will be rendered
 private:
 	vector <Point3f> vertices; // vertices of the cuboid, in local coordinates
 	vector <vector <int>> edges, surfaces; // 12 edges and 6 surfaces of the cuboid
 	vector <bool> edgesVisibility, surfacesVisibility; // Check the visibility of edges and surfaces according to the camera
-	
+	vector <bool> edgesRendered, surfacesRendered; // Check which edges and surfaces will be rendered
+	int Nedges, Nsurfaces; // Number of edges and surfaces to be rendered
+	int primitives; // Type of primitives to be rendered, 0 = ALL, 1 = EDGES, 2 = SURFACES
+
 	int checkIdx(int, int); // Check for invalid memory access
 };
 

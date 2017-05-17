@@ -49,13 +49,19 @@ Cuboid3D::Cuboid3D(float length, float height, float width)
 	for (int i = 0; i < EDGES; i++)
 	{
 		edgesVisibility.push_back(false);
+		edgesRendered.push_back(true);
 	}
+	Nedges = EDGES;
 
 	// SurfacesVisibility initializagtion
 	for (int i = 0; i < SURFACES; i++)
 	{
 		surfacesVisibility.push_back(false);
+		surfacesRendered.push_back(true);
 	}
+	Nsurfaces = SURFACES;
+
+	primitives = 0;
 }
 
 // Destructor
@@ -260,7 +266,14 @@ void Cuboid3D::setEdgeVisibility(int idx, bool visible)
 		return;
 	}
 
-	edgesVisibility[idx] = visible;
+	if (edgesRendered[idx] == true)
+	{
+		edgesVisibility[idx] = visible;
+	}
+	else
+	{ 
+		edgesVisibility[idx] = false;
+	}
 }
 
 bool Cuboid3D::getEdgeVisibility(int idx)
@@ -284,7 +297,14 @@ void Cuboid3D::setSurfaceVisibility(int idx, bool visible)
 		return;
 	}
 
-	surfacesVisibility[idx] = visible;
+	if (surfacesRendered[idx] == true)
+	{
+		surfacesVisibility[idx] = visible;
+	}
+	else
+	{
+		surfacesVisibility[idx] = false;
+	}
 }
 
 // Returns the surface visibility
@@ -298,6 +318,150 @@ bool Cuboid3D::getSurfaceVisibility(int idx)
 vector <bool> Cuboid3D::getSurfacesVisibility() const
 {
 	return surfacesVisibility;
+}
+
+// Set which edges will be rendered
+void Cuboid3D::setEdgesRendered()
+{
+	// Render all edges
+	if (Nedges == EDGES) 
+	{
+		for (int i = 0; i < Nedges; i++)
+		{
+			edgesRendered[i] = true;
+		}
+	}
+	else
+	{
+		// Set all edges to be rendered to false
+		for (int i = 0; i < EDGES; i++)
+		{
+			edgesRendered[i] = false;
+		}
+
+		// Render edges belong only to one surface
+		if (Nedges == 4)
+		{
+			// Find which edges belong to the surface which is going to be rendered
+			for (int i = 0; i < SURFACES; i++)
+			{
+				if (surfacesRendered[i] == true)
+				{
+					vector <int> surface = getSurface(i);
+					for (int j = 0; j < surface.size(); j++)
+					{
+						edgesRendered[surface[j]] = true;
+					}
+					break;
+				}
+			}
+		}
+	}
+}
+
+// Set which edges will be rendered
+void Cuboid3D::setEdgesRendered(int edgeVal)
+{
+	if (Nedges == 1) // Render only one egde
+	{
+		// Set all edges to be rendered to false
+		for (int i = 0; i < EDGES; i++)
+		{
+			edgesRendered[i] = false;
+		}
+
+		if ((edgeVal >= 0) && (edgeVal < EDGES)) // Choose which edge is going to be rendered
+		{
+			edgesRendered[edgeVal] = true;
+		}
+		else
+		{
+			cout << "Not valid edge." << endl;
+		}
+	}
+}
+
+// Set which surface will be rendered
+void Cuboid3D::setSurfacesRendered()
+{
+	// Render all surfaces
+	if (Nsurfaces == SURFACES)
+	{
+		for (int i = 0; i < Nsurfaces; i++)
+		{
+			surfacesRendered[i] = true;
+		}
+	}
+	else if (Nsurfaces == 0)
+	{
+		// Set all surfaces to be rendered to false
+		for (int i = 0; i < SURFACES; i++)
+		{
+			surfacesRendered[i] = false;
+		}
+	}
+}
+
+// Set which surface will be rendered
+void Cuboid3D::setSurfacesRendered(int surfaceVal)
+{
+	if (Nsurfaces == 1) // Render only one surface
+	{
+		// Set all surfaces to be rendered to false
+		for (int i = 0; i < SURFACES; i++)
+		{
+			surfacesRendered[i] = false;
+		}
+
+		if ((surfaceVal >= 0) && (surfaceVal < SURFACES)) // Choose which edge is going to be rendered
+		{
+			surfacesRendered[surfaceVal] = true;
+		}
+		else
+		{
+			cout << "Not valid surface." << endl;
+		}
+	}
+}
+
+// Set which type of primitives will be rendered
+void Cuboid3D::setPrimitives(int primitiveVal)
+{
+	switch (primitiveVal)
+	{
+		case 0: // ALL
+		{
+			primitives = 0;
+			Nsurfaces = SURFACES;
+			Nedges = EDGES;
+			setSurfacesRendered();
+			setEdgesRendered();
+			break;
+		}
+		case 1: // SURFACES
+		{
+			primitives = 1;
+			Nsurfaces = 1;
+			Nedges = 4;
+			setSurfacesRendered(0);
+			setEdgesRendered();
+			break;
+		}
+		case 2: // EDGES
+		{
+			primitives = 2;
+			Nsurfaces = 0;
+			Nedges = 1;
+			setSurfacesRendered();
+			setEdgesRendered(0);
+			break;
+		}
+		default:
+		{
+			cout << "Not valid type of primitives." << endl;
+			break;
+		}
+	}
 }
 
 int Cuboid3D::checkIdx(int idx, int limit)
