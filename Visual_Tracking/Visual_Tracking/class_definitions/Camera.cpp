@@ -15,6 +15,9 @@ Camera::Camera(Vec3f tVal, Vec3f rVal, Point2f principalVal, float fovVal, float
 	principalPoint = principalVal;
 	fov = fovVal;
 	focal = focalVal;
+	
+	// Set rotation matrix
+	R = getRotationEuler(getThetaX(RADIANS), getThetaY(RADIANS), getThetaZ(RADIANS));
 }
 
 Camera::~Camera()
@@ -57,28 +60,61 @@ float Camera::getFocal() const
 	return focal;
 }
 
-// Return x-axis rotation matrix
-Mat Camera::getRotationX() const
+// Change camera position
+void Camera::setPosition(Vec3f tVal)
 {
-	return (Mat_<float>(3, 3) << 1, 0, 0, 0, cos(getThetaX(RADIANS)), -sin(getThetaX(RADIANS)), 0, sin(getThetaX(RADIANS)), cos(getThetaX(RADIANS)));
+	setTx(tVal.val[0]);
+	setTy(tVal.val[1]);
+	setTz(tVal.val[2]);
 }
 
-// Return y-axis rotation matrix
-Mat Camera::getRotationY() const
+// Return camera position
+Vec3f Camera::getPosition() const
 {
-	return (Mat_<float>(3, 3) << cos(getThetaY(RADIANS)), 0, sin(getThetaY(RADIANS)), 0, 1, 0, -sin(getThetaY(RADIANS)), 0, cos(getThetaY(RADIANS)));
+	return Vec3f(getTx(), getTy(), getTz());
 }
 
-// Return z-axis rotation matrix
-Mat Camera::getRotationZ() const
+// Set rotation matrix
+void Camera::setRotation(Mat RVal)
 {
-	return (Mat_<float>(3, 3) << cos(getThetaZ(RADIANS)), -sin(getThetaZ(RADIANS)), 0, sin(getThetaZ(RADIANS)), cos(getThetaZ(RADIANS)), 0, 0, 0, 1);
+	if (IsRotationMatrix(RVal))
+	{
+		RVal.copyTo(R);
+	}
+	else
+	{
+		cout << "The input matrix is not a 3D rotation matrix." << endl;
+	}
 }
 
-// Return x, y, z axes rotation matrix
+// Return rotation matrix
 Mat Camera::getRotation() const
 {
-	return getRotationX() * getRotationY() * getRotationZ();
+	return R;
+}
+
+// Set thetaX value
+void Camera::setThetaX(float thetaXVal)
+{
+	CameraStateSpace::setThetaX(thetaXVal);
+	// Update rotation matrix
+	setRotation(getRotationEuler(getThetaX(RADIANS), getThetaY(RADIANS), getThetaZ(RADIANS)));
+}
+
+// Set thetaY value
+void Camera::setThetaY(float thetaYVal)
+{
+	CameraStateSpace::setThetaY(thetaYVal);
+	// Update rotation matrix
+	setRotation(getRotationEuler(getThetaX(RADIANS), getThetaY(RADIANS), getThetaZ(RADIANS)));
+}
+
+// Set thetaZ value
+void Camera::setThetaZ(float thetaZVal)
+{
+	CameraStateSpace::setThetaZ(thetaZVal);
+	// Update rotation matrix
+	setRotation(getRotationEuler(getThetaX(RADIANS), getThetaY(RADIANS), getThetaZ(RADIANS)));
 }
 
 // Return camera intrinsics matrix
@@ -87,7 +123,16 @@ Mat Camera::getIntrinsics() const
 	return (Mat_<float>(3, 3) << focal, 0, principalPoint.x, 0, focal, principalPoint.y, 0, 0, 1);
 }
 
-Mat Camera::getExtrinsics() const
+// Return camera extrinsics matrix
+Mat Camera::getExtrinsics()
+{
+	setExtrinsics();
+
+	return E;
+}
+
+// Set camera extrinsics matrix
+void Camera::setExtrinsics()
 {
 	// Trasnpose Rotation Matrix
 	Mat Rt;
@@ -97,91 +142,127 @@ Mat Camera::getExtrinsics() const
 	Vec3f RtT = Vec3f(tmp);
 	// Camera extrinsics
 	Mat E = (Mat_<float>(3, 4) << Rt.at<float>(0, 0), Rt.at<float>(0, 1), Rt.at<float>(0, 2), RtT[0], Rt.at<float>(1, 0), Rt.at<float>(1, 1), Rt.at<float>(1, 2), RtT[1], Rt.at<float>(2, 0), Rt.at<float>(2, 1), Rt.at<float>(2, 2), RtT[2]);
-	
-	return E;
+
+	E.copyTo(this->E);
 }
 
-// Return the first derivative of the extrinsics matrix, with respect of the i-th extrinsic parameter.
-Mat Camera::getExtrinsicsDerivative(int idx)
+// Set camera extrinsics matrix - overload
+void Camera::setExtrinsics(Mat EVal)
+{
+	Mat R;
+	Vec3f t;
+	decomposeCameraPose(EVal, R, t);
+	setTx(t.val[0]);
+	setTy(t.val[1]);
+	setTz(t.val[2]);
+
+	if (IsRotationMatrix(R))
+	{
+		Vec3f eulerAngles(matrixToEuler(R));
+		CameraStateSpace::setThetaX(eulerAngles.val[0]);
+		CameraStateSpace::setThetaY(eulerAngles.val[1]);
+		CameraStateSpace::setThetaZ(eulerAngles.val[2]);
+		setRotation(getRotationEuler(getThetaX(RADIANS), getThetaY(RADIANS), getThetaZ(RADIANS)));
+	}
+	else
+	{
+		cout << "The input matrix must contain a 3D rotation matrix at the upper left region." << endl;
+	}
+}
+
+// Return projection first derivative with respect of the i-th
+// se(3) Lie algebra generator.
+Mat Camera::getProjectionDerivative(int idx) const
+{
+	Mat dP;
+	
+	dP = getIntrinsics() * E * getGenerator(idx);
+	return dP;
+}
+
+// Get i-th se(3) Lie algebra generator
+Mat Camera::getGenerator(int idx) const
 {
 	if ((idx > 5) || (idx < 0))
 	{
-		cout << "Invalid extrinsic camera parameter." << endl;
+		cout << "se(3) Lie algebra contains only six generators." << endl;
 		exit(EXIT_FAILURE);
 	}
 
-	// Inverse Rotation Matrix derivative
-	Mat dR, Rt, dRt;
-	transpose(getRotationDerivative(idx), dRt);
-	transpose(getRotation(), Rt);
-	// Trasnpose Rotation Matrix multiplied by vector T - camera position derivative
-	Mat tmp = - (dRt * Mat(getPosition(), false)) - (Rt * Mat(getPositionDerivative(idx)));
-	Vec3f dRtT = Vec3f(tmp);
-	// Camera extrinsics derivative
-	Mat dE = (Mat_<float>(3, 4) << dRt.at<float>(0, 0), dRt.at<float>(0, 1), dRt.at<float>(0, 2), dRtT[0], dRt.at<float>(1, 0), dRt.at<float>(1, 1), dRt.at<float>(1, 2), dRtT[1], dRt.at<float>(2, 0), dRt.at<float>(2, 1), dRt.at<float>(2, 2), dRtT[2]);
-	
-	return dE;
-}
-
-// Return the first derivative of the position vector t
-Vec3f Camera::getPositionDerivative(int idx)
-{
+	Mat G = Mat::zeros(Size(4, 4), CV_32F);
 	switch (idx)
 	{
-		case 0: // x = tx
-			return Vec3f(1, 0, 0);
-
-		case 1: // x = ty
-			return Vec3f(0, 1, 0);
-
-		case 2: // x = tz
-			return Vec3f(0, 0, 1);
-
-		case 3: // x = thetax
-			return Vec3f(0, 0, 0);
-
-		case 4: // x = thetay
-			return Vec3f(0, 0, 0);
-
-		case 5: // x = thetaz
-			return Vec3f(0, 0, 0);
-
-		default:
-			return Vec3f();
+		case 0: // generator - derivative with respect of tx at identity transformation
+		{
+			G.at<float>(0, 3) = 1;
+			break;
+		}
+		case 1: // generator - derivative with respect of ty at identity transformation
+		{
+			G.at<float>(1, 3) = 1;
+			break;
+		}
+		case 2: // generator - derivative with respect of tz at identity transformation
+		{
+			G.at<float>(2, 3) = 1;
+			break;
+		}
+		case 3: // generator - derivative with respect of thetax at identity transformation
+		{
+			G.at<float>(1, 1) = -1;
+			G.at<float>(2, 0) = 1;
+			break;
+		}
+		case 4: // generator - derivative with respect of thetay at identity transformation
+		{
+			G.at<float>(0, 2) = 1;
+			G.at<float>(2, 0) = -1;
+			break;
+		}
+		case 5: // generator - derivative with respect of thetaz at identity transformation
+		{
+			G.at<float>(0, 1) = -1;
+			G.at<float>(1, 0) = 1;
+			break;
+		}
 	}
+
+	return G;
 }
 
-// Return the first derivative of the rotation matrix R
-Mat Camera::getRotationDerivative(int idx)
+// Set camera parameters
+void Camera::setParams(vector <float> paramsVal, vector <State> stateVal)
 {
-	switch (idx)
+	if (stateVal.size() > 6)
 	{
-		case 0: // x = tx
-			return (Mat_<float>(3, 3) << 0, 0, 0, 0, 0, 0, 0, 0, 0);
+		cout << "Up to 6 state parameters are allowed!" << endl;
+		exit(EXIT_FAILURE);
+	}
 
-		case 1: // x = ty
-			return (Mat_<float>(3, 3) << 0, 0, 0, 0, 0, 0, 0, 0, 0);
-
-		case 2: // x = tz
-			return (Mat_<float>(3, 3) << 0, 0, 0, 0, 0, 0, 0, 0, 0);
-
-		case 3: // x = thetax
+	for (int i = 0; i < stateVal.size(); i++)
+	{
+		switch (stateVal[i])
 		{
-			Mat dRx = (Mat_<float>(3, 3) << 0, 0, 0, 0, -sin(getThetaX(RADIANS)), -cos(getThetaX(RADIANS)), 0, cos(getThetaX(RADIANS)), -sin(getThetaX(RADIANS)));
-			return (dRx * getRotationY() * getRotationZ());
-		}
-		case 4: // x = thetay
-		{
-			Mat dRy = (Mat_<float>(3, 3) << -sin(getThetaY(RADIANS)), 0, cos(getThetaY(RADIANS)), 0, 0, 0, -cos(getThetaY(RADIANS)), 0, -sin(getThetaY(RADIANS)));
-			return (getRotationX() * dRy * getRotationZ());
-		}
-		case 5: // x = thetaz
-		{
-			Mat dRz = (Mat_<float>(3, 3) << -sin(getThetaZ(RADIANS)), -cos(getThetaZ(RADIANS)), 0, cos(getThetaZ(RADIANS)), -sin(getThetaZ(RADIANS)), 0, 0, 0, 0);
-			return (getRotationX() * getRotationY() * dRz);
-		}
-
+		case X:
+			setTx(paramsVal[i]);
+			break;
+		case Y:
+			setTy(paramsVal[i]);
+			break;
+		case Z:
+			setTz(paramsVal[i]);
+			break;
+		case THETAX:
+			setThetaX(paramsVal[i]);
+			break;
+		case THETAY:
+			setThetaY(paramsVal[i]);
+			break;
+		case THETAZ:
+			setThetaZ(paramsVal[i]);
+			break;
 		default:
-			return Mat();
+			break;
+		}
 	}
 }

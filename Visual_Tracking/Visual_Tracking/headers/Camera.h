@@ -1,13 +1,16 @@
 #pragma once
 // OpenCV libraries
-#include "opencv2\imgcodecs.hpp"
+#include "opencv2/imgcodecs.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
+#include "opencv2/calib3d/calib3d.hpp"
 
 // C++ libraries
 #include <iostream>
 #include <vector>
 
 #include "CameraStateSpace.h"
+#include "Rotations3D.h"
+#include "utility.h"
 
 #define PI 3.14159265f
 
@@ -30,22 +33,34 @@ public:
 	void setFocal(float); // Change focal length
 	float getFocal() const; // Return focal length
 
-	Mat getRotationX() const; // Return x-axis rotation matrix
-	Mat getRotationY() const; // Return y-axis rotation matrix
-	Mat getRotationZ() const; // Return z-axis rotation matrix
-	Mat getRotation() const; // Return x, y, z axes rotation matrix
-
-	Mat getIntrinsics() const; // Return camera intrinsics matrix
-	Mat getExtrinsics() const; // Return camera extrinsics matrix
+	void setPosition(Vec3f); // Change camera position
+	Vec3f getPosition() const; // Return camera position
 	
-	Mat getExtrinsicsDerivative(int); // Return the first derivative of the extrinsics matrix
-								  // with respect of the i-th extrinsic parameter.
+	void setRotation(Mat); // Set rotation matrix
+	Mat getRotation() const; // Return rotation matrix
+	void setThetaX(float); // Set thetaX value
+	void setThetaY(float); // Set thetaY value
+	void setThetaZ(float); // Set thetaZ value
+
+	void setExtrinsics(); // Set camera extrinsics matrix
+	void setExtrinsics(Mat); // Set camera extrinsics matrix
+	Mat getIntrinsics() const; // Return camera intrinsics matrix
+	Mat getExtrinsics(); // Return camera extrinsics matrix
+	
+	Mat getProjectionDerivative(int) const; // Return projection first derivative with respect of the i-th
+											// se(3) Lie algebra generator.
+
+	Mat getGenerator(int) const; // Get i-th se(3) Lie algebra generator
+
+	void setParams(vector <float>, vector <State>); // Set camera parameters
+	
 private:
 	// Camera Intrinsics
 	Point2f principalPoint; // Principal point - center of image plane
 	float fov; // F.O.V
 	float focal; // Focal length
-	Vec3f getPositionDerivative(int); // Return the first derivative of the position vector t
-	Mat getRotationDerivative(int); // Return the first derivative of the rotation matrix R
+	// Camera Extrinsics
+	Mat R; // Camera rotation matrix
+	Mat E; // Camera extrinsics matrix
 };
 

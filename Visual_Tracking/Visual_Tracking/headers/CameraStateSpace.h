@@ -29,9 +29,7 @@ public:
 	float getTx() const; // Return x-axis position
 	float getTy() const; // Return y-axis position
 	float getTz() const; // Return x-axis position
-	void setPosition(Vec3f); // Change camera position
-	Vec3f getPosition() const; // Return camera position
-
+	
 	void setThetaX(float); // Change x-axis rotation
 	void setThetaY(float); // Change y-axis rotation
 	void setThetaZ(float); // Change z-axis rotation
@@ -39,7 +37,6 @@ public:
 	float getThetaY(Type) const; // Return y-axis rotation
 	float getThetaZ(Type) const; // Return x-axis rotation
 
-	void setParams(vector <float>, vector <State>); // Set camera parameters
 	vector <float> getParams(vector <State>); // Get camera parameters
 
 	void setParamsNum(int); // Set the parameters number

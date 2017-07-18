@@ -14,7 +14,7 @@ Distance::~Distance()
 }
 
 // Set vertex derivative of the cuboid2d, in homogeneous coordinates
-void Distance::setVerticeDeriv(Point3f vertexDerivVal, Point3f homogeneousVal)
+void Distance::setVertexDeriv(Point3f vertexDerivVal, Point3f homogeneousVal)
 {
 	if (verticesDerivatives.size() <= VERTICES)
 	{
@@ -24,7 +24,7 @@ void Distance::setVerticeDeriv(Point3f vertexDerivVal, Point3f homogeneousVal)
 }
 
 // Returns a homogeneous vertex of the cuboid2d
-Point3f Distance::getVerticeDeriv(int idx)
+Point3f Distance::getVertexDeriv(int idx)
 {
 	// Check if idx is between 0..VERTICES=8
 	checkIdx(idx, VERTICES);
@@ -134,11 +134,37 @@ Point2f Distance::getIntervalDeriv(int idx)
 	return mijDerivatives[idx];
 }
 
-// Set error for one pair mij - sij
-void Distance::setError(Vec2f errorsVal)
+// Returns a vector of cuboid2d edges subintervals derivatives
+vector <Point2f> Distance::getIntervalsDeriv() const
 {
-	errors.push_back(errorsVal.val[0]);
-	errors.push_back(errorsVal.val[1]);
+	return mijDerivatives;
+}
+
+// Set fij
+void Distance::setFij(float fijVal)
+{
+	fij.push_back(fijVal);
+}
+
+// Get fij
+float Distance::getFij(int idx)
+{
+	// Check if idx is valid
+	checkIdx(idx, fij.size());
+
+	return fij[idx];
+}
+
+// Get all fijs
+vector<float> Distance::getFijs() const
+{
+	return fij;
+}
+
+// Set error for one pair mij - sij
+void Distance::setError(float errorsVal)
+{
+	errors.push_back(errorsVal);
 }
 
 // Returns a vector of errors for a specific parameter derivative
@@ -151,37 +177,6 @@ vector <float> Distance::getErrors() const
 size_t Distance::getErrorsSize() const
 {
 	return errors.size();
-}
-
-// Set error derivative for one pair mij - sij
-void Distance::setErrorDeriv(Vec2f errorDerivVal)
-{
-	errorsDeriv.push_back(errorDerivVal.val[0]);
-	errorsDeriv.push_back(errorDerivVal.val[1]);
-}
-
-// Returns a vector of errors derivatives
-vector <float> Distance::getErrorsDeriv() const
-{
-	return errorsDeriv;
-}
-
-// Returns  the size of the error vector derivatives = 2(distance vector) * M (number of rendered model edges) * N (number of subintervals on each rendered model edge)
-size_t Distance::getErrorsDerivSize() const
-{
-	return errorsDeriv.size();
-}
-
-// Returns a vector of cuboid2d edges subintervals derivatives
-vector <Point2f> Distance::getIntervalsDeriv() const
-{
-	return mijDerivatives;
-}
-
-// Returns the number of mij
-size_t Distance::getIntervalsDerivSize() const
-{
-	return mijDerivatives.size();
 }
 
 // Set edge's subinterval number

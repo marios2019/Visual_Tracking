@@ -68,20 +68,6 @@ float CameraStateSpace::getTz() const
 	return tZ;
 }
 
-// Change camera position
-void CameraStateSpace::setPosition(Vec3f tVal)
-{
-	tX = tVal.val[0];
-	tY = tVal.val[1];
-	tZ = tVal.val[2];
-}
-
-// Return camera position
-Vec3f CameraStateSpace::getPosition() const
-{
-	return Vec3f(getTx(), getTy(), getTz());
-}
-
 // Change x-axis rotation
 void CameraStateSpace::setThetaX(float thetaXVal)
 {
@@ -113,7 +99,7 @@ float CameraStateSpace::getThetaX(Type type) const
 	}
 	else
 	{
-		cout << "Metic unit must be DEGREES of RADIANS" << endl;
+		cout << "Metric unit must be in DEGREES or RADIANS" << endl;
 		exit(EXIT_FAILURE);
 	}
 }
@@ -131,7 +117,7 @@ float CameraStateSpace::getThetaY(Type type) const
 	}
 	else
 	{
-		cout << "Metic unit must be DEGREES of RADIANS" << endl;
+		cout << "Metric unit must be in DEGREES or RADIANS" << endl;
 		exit(EXIT_FAILURE);
 	}
 }
@@ -149,39 +135,8 @@ float CameraStateSpace::getThetaZ(Type type) const
 	}
 	else
 	{
-		cout << "Metic unit must be DEGREES of RADIANS" << endl;
+		cout << "Metric unit must be in DEGREES or RADIANS" << endl;
 		exit(EXIT_FAILURE);
-	}
-}
-
-// Set camera parameters
-void CameraStateSpace::setParams(vector <float> paramsVal, vector <State> stateVal)
-{
-	for (int i = 0; i < stateVal.size(); i++)
-	{
-		switch (stateVal[i])
-		{
-			case X:
-				setTx(paramsVal[i]);
-				break;
-			case Y:
-				setTy(paramsVal[i]);
-				break;
-			case Z:
-				setTz(paramsVal[i]);
-				break;
-			case THETAX:
-				setThetaX(paramsVal[i]);
-				break;
-			case THETAY:
-				setThetaY(paramsVal[i]);
-				break;
-			case THETAZ:
-				setThetaZ(paramsVal[i]);
-				break;
-			default:
-				break;												
-		}
 	}
 }
 

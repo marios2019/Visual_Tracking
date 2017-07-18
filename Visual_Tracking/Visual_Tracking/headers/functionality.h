@@ -16,19 +16,22 @@
 using namespace cv;
 using namespace std;
 
-#include "Cuboid3D.h"
-#include "Camera.h"
+#include "cameraCalibration.h"
+#include "projectiveGeometry.h"
+#include "utility.h"
+#include "Rotations3D.h"
+#include "controls.h"
 
 // Virtual Camera default extrinsics parameters
 #define TX -28
 #define TY 30
 #define TZ 80
 #define RX 160
-#define RY 30
+#define RY -30
 #define RZ 0
 
 // Number of mijs
-#define MNUM 3
+#define MNUM 5
 
 //#define F_DEBUG
 
@@ -41,7 +44,13 @@ Cuboid2D rendering(Cuboid3D&, Camera, Mat&, Mat&, string);
 // Render function model
 Cuboid2D rendering(Cuboid3D&, Camera, Mat&, Mat&, vector <Distance>&, string);
 // Dissimilarity between data and model object
-void dissimilarity(Cuboid2D&, Camera, Mat&, Mat, vector <Distance>&, int);
+void dissimilarity(Cuboid2D&, Camera, Mat&, Mat, vector <Distance>&, DistClosedForm&, int);
+// Calculate distance between model and data
+void calcDist(vector <Distance>&, DistClosedForm&, Vec2f, Vec2f, vector <Point2f>, Point2f, Point2f, float, float, Mat&, Mat, int, int);
+// Calculate new extrinsics matrix closer to data
+void fitting(Camera&, DistClosedForm&, int);
+// Exponential map se(3) to SE(3)
+Mat expMap(DistClosedForm&);
 
 // Secondary functions declarations
 // Draw object on image planes
@@ -50,14 +59,6 @@ void drawObj(Cuboid2D, Mat&, Mat&, string);
 void clipping(Cuboid2D&, int, int);
 // Check if a surface is being occluded by another one
 int occlusionSurf(vector <int>, vector <Point3f>, Point3f);
-// Returns the Euclidean norm of a 3D vector
-float norm2(Vec3f);
-// Returns the Euclidean norm of a 2D vector
-float norm2(Vec2f);
-// Compute euclidean distance between two points
-float euclideanDistanceSquared(Point2i, Point2i);
-// Keys pressed handler - case sensitive
-void keyboardHandler(Camera&, Camera&, Cuboid3D&, Cuboid3D&, int&, vector <State>&, bool&, bool&, bool&);
 
 // Main functions definitions
 // Visual tracker main function
@@ -66,10 +67,10 @@ void visualTracker(Cuboid3D& model, Cuboid3D& Data, int WIDTH, int HEIGHT)
 	bool exitFlag = false; // If true, exit application
 	bool updateFlag = true; // If true render again cuboids
 	bool fitFlag = false; // If true start non linear fitting
+	vector <float> defaultParams = { TX, TY, TZ, RX, RY, RZ, MNUM };
 	int iterations = 0; // Number of non linear fitting iterations
 	float squareDiff = 0.f; // Square difference between xi+1 and xi state parameters
 	vector <State> state = { X, Y, Z, THETAX, THETAY, THETAZ };
-	Mat Jglobal, Eglobal;
 	int mNum = MNUM; // Number of mij intervals
 
 	// Image plane WIDTHxHEIGHT pixels
@@ -86,7 +87,7 @@ void visualTracker(Cuboid3D& model, Cuboid3D& Data, int WIDTH, int HEIGHT)
 	float fovVirtual = 60.f; // F.O.V
 	float focalVirtual = (WIDTH / 2) / ((float)(tan((fovVirtual / 2) * PI / 180.0))); // Focal length
 	Camera virtualCam(tVirtual, rVirtual, Point2f(u0Virtual, v0Virtual), fovVirtual, focalVirtual, state.size());
-	
+
 	// Real camera initialization
 	// Camera Extrinsics
 	Vec3f tReal(TX + 2, TY, TZ); // Camera position
@@ -96,9 +97,12 @@ void visualTracker(Cuboid3D& model, Cuboid3D& Data, int WIDTH, int HEIGHT)
 	float fovReal = 60.f; // F.O.V
 	float focalReal = (WIDTH / 2) / ((float)(tan((fovReal / 2) * PI / 180.0))); // Focal length
 	Camera realCam(tReal, rReal, Point2f(u0Real, v0Real), fovReal, focalReal, state.size());
-	
+
 	while (!exitFlag)
 	{
+		DistClosedForm distCF;
+		int edgesNum;
+		
 		if (updateFlag)
 		{
 			// Render model
@@ -107,91 +111,35 @@ void visualTracker(Cuboid3D& model, Cuboid3D& Data, int WIDTH, int HEIGHT)
 			{
 				distances.push_back(Distance());
 			}
+
 			Cuboid2D modelProjection(rendering(model, virtualCam, imagePlane, imagePlaneModel, distances, "model"));
 			// Render data
 			Cuboid2D dataProjection(rendering(Data, realCam, imagePlane, imagePlaneData, "data"));
 			// Disimillarity between data and model object
-			dissimilarity(modelProjection, virtualCam, imagePlane, imagePlaneData, distances, mNum);
+			dissimilarity(modelProjection, virtualCam, imagePlane, imagePlaneData, distances, distCF, mNum);
+			edgesNum = (int) modelProjection.getEdgesSize();
 
 			// Display camera parameters
-			Mat virtualValues(70, 400, CV_8UC3, Scalar::all(255));
-			Mat realValues(70, 400, CV_8UC3, Scalar::all(255));
-			// Virtual Camaera Parameters
-			string values = "Tx: " + to_string(virtualCam.getTx()) + " Ty: " + to_string(virtualCam.getTy()) + " Tz: " + to_string(virtualCam.getTz());
-			putText(virtualValues, values, cvPoint(0, 20), FONT_HERSHEY_COMPLEX_SMALL, 0.6, cvScalar(0, 0, 0), 1, CV_AA);
-			values.clear();
-			values = "Rx: " + to_string(virtualCam.getThetaX(DEGREES)) + " Ry: " + to_string(-virtualCam.getThetaY(DEGREES)) + " Rz: " + to_string(-virtualCam.getThetaZ(DEGREES));
-			putText(virtualValues, values, cvPoint(0, 50), FONT_HERSHEY_COMPLEX_SMALL, 0.6, cvScalar(0, 0, 0), 1, CV_AA);
-			values.clear();
-			// Real Camaera Parameters
-			values = "Tx: " + to_string(realCam.getTx()) + " Ty: " + to_string(realCam.getTy()) + " Tz: " + to_string(realCam.getTz());
-			putText(realValues, values, cvPoint(0, 20), FONT_HERSHEY_COMPLEX_SMALL, 0.6, cvScalar(0, 0, 0), 1, CV_AA);
-			values.clear();
-			values = "Rx: " + to_string(realCam.getThetaX(DEGREES)) + " Ry: " + to_string(-realCam.getThetaY(DEGREES)) + " Rz: " + to_string(-realCam.getThetaZ(DEGREES));
-			putText(realValues, values, cvPoint(0, 50), FONT_HERSHEY_COMPLEX_SMALL, 0.6, cvScalar(0, 0, 0), 1, CV_AA);
-			// Show camera parameters
-			const char* virtualCamParams = "Virtual Camera Parameters";
-			const char* realCamParams = "Real Camera Parameters";
-			imshow(virtualCamParams, virtualValues);
-			imshow(realCamParams, realValues);
-			waitKey(1);
+			dispCamParams(virtualCam, realCam);
 
 			// Errors vector
 			vector <float> errors;
 			errors = distances[0].getErrors();
 			if (!errors.empty())
 			{
-				Mat E = Mat((int)errors.size(), 1, CV_32FC1);
+				Mat E = Mat((int)errors.size(), 1, CV_32F);
 				memcpy(E.data, errors.data(), errors.size() * sizeof(float));
-				E.copyTo(Eglobal);
-				// Jacobian of errors vector for each state parameter
-				vector <vector <float>> Jacobian;
-				for (int i = 0; i < distances.size(); i++)
-				{
-					Jacobian.push_back(distances[i].getErrorsDeriv());
-				}
-				Mat J = Mat((int)Jacobian[0].size(), (int)Jacobian.size(), CV_32FC1);
-				for (int i = 0; i < Jacobian.size(); i++)
-				{
-					Mat Ji = Mat((int)Jacobian[i].size(), 1, CV_32FC1);
-					memcpy(Ji.data, Jacobian[i].data(), Jacobian[i].size() * sizeof(float));
-					Ji.col(0).copyTo(J.col(i));
-				}
-				J.copyTo(Jglobal);
-				cout << "Dissimilarity between model and data object: " << E.dot(E) << endl;
+				cout << "Dissimilarity between model and data object: " << sum(E)[0] << endl;
 			}
 		}
-		// Non linear fitting - Gauss Newton
 		if (fitFlag)
 		{
-			vector <float> tmp;
-			tmp = virtualCam.getParams(state);
-			Mat x(virtualCam.getParamsNum(), 1, CV_32FC1);
-			Mat xNew(virtualCam.getParamsNum(), 1, CV_32FC1);
-			Mat Jinv;
-			Mat Jt;
-			memcpy(x.data, tmp.data(), tmp.size() * sizeof(float));
-			transpose(Jglobal, Jt);
-			invert(Jt*Jglobal, Jinv);
-			Mat Jgn = Jinv * Jt;
-			xNew = x - Jgn * Eglobal;
-			vector <float> xi;
-			for (int i = 0; i < virtualCam.getParamsNum(); i++)
-			{
-				xi.push_back(xNew.at<float>(i));
-			}
-			virtualCam.setParams(xi, state);
+			// Calculate new extrinsics matrix with smaller error according to data
+			fitting(virtualCam, distCF, edgesNum);
+
 			++iterations;
-			squareDiff = (float) abs(xNew.dot(xNew) - x.dot(x));
-			// Iterations limit
-			if (iterations == 10)
+			if (iterations == 1)
 			{
-				cout << "Number of iterations: " << iterations << ", state parameters: ";
-				for (int i = 0; i < virtualCam.getParamsNum(); i++)
-				{
-					cout << " x" << i << ": " << virtualCam.getParams(state)[i];
-				}
-				cout << "\nSquare difference between xi+1 and xi state parameters: " << squareDiff <<  endl;
 				fitFlag = false;
 				iterations = 0;
 			}
@@ -199,7 +147,7 @@ void visualTracker(Cuboid3D& model, Cuboid3D& Data, int WIDTH, int HEIGHT)
 		else
 		{
 			// Keys pressed handler
-			keyboardHandler(virtualCam, realCam, model, Data, mNum, state, exitFlag, updateFlag, fitFlag);
+			keyboardHandler(virtualCam, realCam, model, Data, mNum, state, defaultParams, exitFlag, updateFlag, fitFlag);
 		}
 	}
 }
@@ -256,7 +204,7 @@ void modelData(float &length, float &height, float &width)
 	}
 }
 
-// Render function data
+// Render function - data
 Cuboid2D rendering(Cuboid3D &Cuboid3D, Camera camera, Mat &imagePlane, Mat &imagePlaneObj, string type)
 {
 	// Initialization
@@ -278,6 +226,7 @@ Cuboid2D rendering(Cuboid3D &Cuboid3D, Camera camera, Mat &imagePlane, Mat &imag
 
 	// Perspective projection matrix
 	Mat P = camera.getIntrinsics() * camera.getExtrinsics();
+
 #ifdef F_DEBUG
 	cout << "Camera Position: \n t = " << camera.getPosition() << endl;
 	cout << "\nRotation angles: \n theta_x = " << camera.getThetaX(DEGREES) << ", theta_y = " << camera.getThetaY(DEGREES) << ", theta_z = " << camera.getThetaZ(DEGREES) << endl;
@@ -389,7 +338,7 @@ Cuboid2D rendering(Cuboid3D &Cuboid3D, Camera camera, Mat &imagePlane, Mat &imag
 	return objProjection;
 }
 
-// Render function model
+// Render function - model
 Cuboid2D rendering(Cuboid3D &Cuboid3D, Camera camera, Mat &imagePlane, Mat &imagePlaneObj, vector <Distance> &distances, string type)
 {
 	// Initialization
@@ -412,6 +361,7 @@ Cuboid2D rendering(Cuboid3D &Cuboid3D, Camera camera, Mat &imagePlane, Mat &imag
 	
 	// Perspective projection matrix
 	Mat P = camera.getIntrinsics() * camera.getExtrinsics();
+
 #ifdef F_DEBUG
 	cout << "Camera Position: \n t = " << camera.getPosition() << endl;
 	cout << "\nRotation angles: \n theta_x = " << camera.getThetaX(DEGREES) << ", theta_y = " << camera.getThetaY(DEGREES) << ", theta_z = " << camera.getThetaZ(DEGREES) << endl;
@@ -440,10 +390,10 @@ Cuboid2D rendering(Cuboid3D &Cuboid3D, Camera camera, Mat &imagePlane, Mat &imag
 		for (int j = 0; j < camera.getParamsNum(); j++)
 		{
 			// Perspective projection derivative matrix
-			Mat dP = camera.getIntrinsics() * camera.getExtrinsicsDerivative(j);
+			Mat dP = camera.getProjectionDerivative(j);
 			Mat tmpDeriv = dP * Mat(homogeneous, false);
 			Point3f homogeneousDeriv(tmpDeriv);
-			distances[j].setVerticeDeriv(homogeneousDeriv, projection);
+			distances[j].setVertexDeriv(homogeneousDeriv, projection);
 		}
 		homogeneous.clear();
 	}
@@ -451,6 +401,7 @@ Cuboid2D rendering(Cuboid3D &Cuboid3D, Camera camera, Mat &imagePlane, Mat &imag
 	// Create cuboid2d - projection of cuboid3d
 	Cuboid2D objProjection(homogeneousVertices);
 	homogeneousVertices.clear();
+
 #ifdef F_DEBUG
 	for (int i = 0; i < Cuboid3D.getVerticesSize(); i++)
 	{
@@ -463,18 +414,21 @@ Cuboid2D rendering(Cuboid3D &Cuboid3D, Camera camera, Mat &imagePlane, Mat &imag
 	cout << "\nAngle between camera direction and surface's normal:" << endl;
 	cout << "------------------------------------------------------" << endl;
 #endif
+
 	for (int i = 0; i < Cuboid3D.getSurfacesSize(); i++)
 	{
+
 #ifdef F_DEBUG
 		cout << "Surface " << i << " -->";
 #endif
+
 		// Check if surface is not occluded
 		if (!occlusionSurf(Cuboid3D.getSurface(i), Cuboid3D.getVertices(), camera.getPosition()))
 		{
 			// Surface i is visible
 			Cuboid3D.setSurfaceVisibility(i, true);
 			surface = Cuboid3D.getSurface(i);
-			if (Cuboid3D.getSurfaceVisibility(i))
+			if (Cuboid3D.getSurfaceVisibility(i)) // If rendered ==  true
 			{
 				objProjection.setSurface(surface);
 			}
@@ -490,10 +444,11 @@ Cuboid2D rendering(Cuboid3D &Cuboid3D, Camera camera, Mat &imagePlane, Mat &imag
 						checkEdge = Cuboid3D.getEdge(k);
 						iter1 = find(checkEdge.begin(), checkEdge.end(), edge[0]);
 						iter2 = find(checkEdge.begin(), checkEdge.end(), edge[1]);
+						// Find the edge that belongs to the current surface
 						if ((iter1 != checkEdge.end()) && (iter2 != checkEdge.end()))
 						{
 							Cuboid3D.setEdgeVisibility(k, true);
-							if (Cuboid3D.getEdgeVisibility(k))
+							if (Cuboid3D.getEdgeVisibility(k)) // If rendered == true
 							{
 								pointsPxl.push_back(objProjection.getVertexPxl(edge[0]));
 								pointsPxl.push_back(objProjection.getVertexPxl(edge[1]));
@@ -543,13 +498,12 @@ Cuboid2D rendering(Cuboid3D &Cuboid3D, Camera camera, Mat &imagePlane, Mat &imag
 }
 
 // Dissimilarity between data and model object
-void dissimilarity(Cuboid2D &model, Camera virtualCam, Mat &imagePlane, Mat imagePlaneData, vector <Distance> &distances, int mNum)
+void dissimilarity(Cuboid2D &model, Camera virtualCam, Mat &imagePlane, Mat imagePlaneData, vector <Distance> &distances, DistClosedForm &distCF, int mNum)
 {
 	// Initialization
 	float offsetOut, offsetIn, normVec, normNormalVec;
-	float normalOffset, maxValue = 765;
-	Vec2f vec, normalOut, normalIn, normalVec, checkNormal;
-	Point2f  vi, vj, p, tmp, pN, pC, p_mi, pNormal, pCheck, intersection;
+	Vec2f vec, normalOut, normalIn, checkNormal;
+	Point2f  vi, vj, p, tmp, pC, p_mi, pNormal, pCheck;
 	vector <Point2f> normalLine, edge;
 	Vec3b pixel;
 	Rect rectangle(0, 0, imagePlane.cols, imagePlane.rows);
@@ -579,13 +533,16 @@ void dissimilarity(Cuboid2D &model, Camera virtualCam, Mat &imagePlane, Mat imag
 #ifdef F_DEBUG
 		cout << "Edge " << edge[0] << " --> " << edge[1];
 #endif
+		
 		vi = edge[0];
 		vj = edge[1];
 		vec = vj - vi;
 		normVec = norm2(vec);
+
 #ifdef F_DEBUG
 		cout << " edge length = " << normVec;
 #endif
+
 		if (normVec > 0.f)
 		{
 			// In and Out normal for each edge
@@ -595,9 +552,11 @@ void dissimilarity(Cuboid2D &model, Camera virtualCam, Mat &imagePlane, Mat imag
 			normalIn.val[0] = -(vi.y - vj.y);
 			normalIn.val[1] = vi.x - vj.x;
 			normalIn = normalIn / max(norm2(normalIn), 0.0001f);
+
 #ifdef F_DEBUG
 			cout << ", normalOut: " << normalOut << ", normalIn: " << normalIn << ", mi's:" << endl;
 #endif
+			
 			// For each mi on vivj edge compute normal vector and distance from data object
 			for (int j = 1; j < (mNum - 1); j++)
 			{
@@ -607,9 +566,11 @@ void dissimilarity(Cuboid2D &model, Camera virtualCam, Mat &imagePlane, Mat imag
 				p = vec * ((float)j / (float)(mNum - 1));
 				p = vi + p;
 				p_mi = p;
+
 #ifdef F_DEBUG
 				cout << p_mi << " ";
 #endif
+
 				// Draw Out normal from current mi
 				tmp.x = p_mi.x + offsetOut * normalOut.val[0];
 				tmp.y = p_mi.y + offsetOut * normalOut.val[1];
@@ -681,82 +642,9 @@ void dissimilarity(Cuboid2D &model, Camera virtualCam, Mat &imagePlane, Mat imag
 				arrowedLine(imagePlane, p_mi, pNormal, CV_RGB(0, 0, 0), 1, CV_AA, 0, 0.5);
 				circle(imagePlane, p_mi, 2, CV_RGB(0, 0, 0), -1, 8, 0);
 
-				// Calculate edge distance between model and data object
-				normalOffset = offsetOut + offsetIn;
-				normalVec = normalLine[1] - normalLine[0];
-				vector <float> pixelValue, weights;
-				vector <Point2f> sijPoints;
-				for (int k = 0; k <= normalOffset; k++)
-				{
-					pN = normalVec * ((float)k / (float)(normalOffset));
-					pN = normalLine[0] + pN;
-					pNormal = pN;
-					// Find the pixel with the smallest value
-					pixel = imagePlaneData.at<Vec3b>(pNormal);
-					pixelValue.push_back((float) pixel.val[0] + pixel.val[1] + pixel.val[2]);
-					if (pixelValue.back() < maxValue)
-					{
-						weights.push_back(pixelValue.back() / 765);
-						sijPoints.push_back(pNormal);
-					}
-				}
-				// Calculate euclidean distance between model and data edge
-				if (sijPoints.size() > 0)
-				{
-					// Intersection is found
-					// Find exact sij point on the data edge - weighted average
-					float weightsSum = 0.f;
-					for (int k = 0; k < sijPoints.size(); k++)
-					{
-						intersection += (1 - weights[k]) * sijPoints[k];
-						weightsSum += (1 - weights[k]);
-					}
-					intersection.x = intersection.x / weightsSum;
-					intersection.y = intersection.y / weightsSum;
-					circle(imagePlane, intersection, 2, CV_RGB(255, 0, 0), -1, CV_AA, 0);
-					// Assign mij, calculate mij derivatives, assign dij and calculate dij derivatives
-					for (int s = 0; s < (int)distances.size(); s++)
-					{
-						distances[s].setInterval(p_mi);
-						Point2f dp_mi, dsij = Point2f(0.f, 0.f);
-						Vec2f dvec, dij, ddij;
-						dvec = distances[s].getEdgeDeriv(i)[1] - distances[s].getEdgeDeriv(i)[0];
-						dp_mi = ((float)j / (float)(mNum - 1)) * dvec;
-						dp_mi += distances[s].getEdgeDeriv(i)[0];
-						distances[s].setIntervalDeriv(dp_mi);
-						dij = (Point2f) (intersection - p_mi);
-						ddij = dsij - dp_mi;
-						distances[s].setError(dij);
-						distances[s].setErrorDeriv(ddij);
-					}
-				}
-				else
-				{
-					// Assign mij, calculate mij derivatives, assign dij and calculate dij derivatives
-					// Intersection not found
-					for (int s = 0; s < distances.size(); s++)
-					{
-						distances[s].setInterval(p_mi);
-						float lambda = offsetOut;
-						Point2f dp_mi;
-						Vec2f dvec, dij, ddij, dnormal, dnorm, normal;
-						normal = normalOut;
-						dvec = distances[s].getEdgeDeriv(i)[1] - distances[s].getEdgeDeriv(i)[0];
-						dp_mi = ((float)j / (float)(mNum - 1)) * dvec;
-						dp_mi += distances[s].getEdgeDeriv(i)[0];
-						distances[s].setIntervalDeriv(dp_mi);
-						dij.val[0] = p_mi.x + lambda * normal.val[0];
-						dij.val[1] = p_mi.y + lambda * normal.val[1];
-						dnormal.val[0] = -dvec.val[1];
-						dnormal.val[1] = dvec.val[0];
-						dnorm = 0.5f * powf(vec.dot(vec), 0.5f) * dnormal;
-						divide(dnormal, dnorm, dnormal);
-						add((Vec2f)dp_mi, lambda*dnormal, ddij);
-						distances[s].setError(dij);
-						distances[s].setErrorDeriv(ddij);
-					}
-				}
-				intersection = Point2f (0.f, 0.f);
+				// Calculate distanse
+				calcDist(distances, distCF, normalOut, vec, normalLine, pNormal, p_mi, offsetOut, offsetIn, imagePlane, imagePlaneData, i, j);
+				
 				normalLine.clear();
 			}
 		}
@@ -769,6 +657,168 @@ void dissimilarity(Cuboid2D &model, Camera virtualCam, Mat &imagePlane, Mat imag
 	string window_name = "Model - Data dissimilarity";
 	namedWindow(window_name, WINDOW_AUTOSIZE);
 	imshow(window_name, imagePlane);
+}
+
+// Calculate distance between model and data
+void calcDist(vector <Distance> &distances, DistClosedForm &distCF, Vec2f normalOut, Vec2f vec, vector <Point2f> normalLine, 
+			  Point2f pNormal, Point2f p_mi, float offsetOut, float offsetIn, Mat &imagePlane, Mat imagePlaneData, int idx, int j)
+{
+	Point2f intersection, pN;
+	float normalOffset, maxValue = 765.f;
+	Vec2f normalVec;
+	Vec3b pixel;
+	int mNum = distances[0].getIntervalNum() + 2;
+
+	// Calculate edge distance between model and data object
+	normalOffset = offsetOut + offsetIn;
+	normalVec = normalLine[1] - normalLine[0];
+	vector <float> weights;
+	float pixelValue;
+	vector <Point2f> sijPoints;
+	int pointer = 0, continuous = 0;
+	bool first = false;
+	for (int k = 0; k <= normalOffset; k++)
+	{
+		pN = normalVec * ((float)k / (float)(normalOffset));
+		pN = normalLine[0] + pN;
+		pNormal = pN;
+		// Find the pixel with the smallest value
+		pixel = imagePlaneData.at<Vec3b>(pNormal);
+		pixelValue = (float) (pixel.val[0] + pixel.val[1] + pixel.val[2]);
+		if (pixelValue < maxValue) 
+		{
+			// First interpolation
+			if (!first)
+			{
+				first = true;
+			}
+			pointer = k;
+			if (pointer == continuous + 1)
+			{
+				weights.push_back(pixelValue / 765.f);
+				sijPoints.push_back(pNormal);
+				continuous = k;
+			}
+		}
+		else
+		{
+			if (!first)
+			{
+				continuous = k;
+			}
+		}
+	}
+	// Calculate euclidean distance between model and data edge
+	if (sijPoints.size() > 0)
+	{
+		// Intersection is found
+		// Find exact sij point on the data edge - weighted average
+		float weightsSum = 0.f;
+		for (int k = 0; k < sijPoints.size(); k++)
+		{
+			intersection += (1 - weights[k]) * sijPoints[k];
+			weightsSum += (1 - weights[k]);
+		}
+		intersection.x = intersection.x / weightsSum;
+		intersection.y = intersection.y / weightsSum;
+		circle(imagePlane, intersection, 2, CV_RGB(255, 0, 0), -1, CV_AA, 0);
+		// Assign mij, calculate mij derivatives, assign dij and calculate dij derivatives
+		for (int s = 0; s < (int)distances.size(); s++)
+		{
+			distances[s].setInterval(p_mi);
+			Point2f dp_mi, dsij = Point2f(0.f, 0.f);
+			Vec2f dvec, dij, lij;
+			dvec = distances[s].getEdgeDeriv(idx)[1] - distances[s].getEdgeDeriv(idx)[0];
+			dp_mi = ((float)j / (float)(mNum - 1)) * dvec;
+			dp_mi += distances[s].getEdgeDeriv(idx)[0];
+			distances[s].setIntervalDeriv(dp_mi);
+			dij = (Point2f)(intersection - p_mi);
+			distances[s].setError(norm2(dij));
+			lij = dp_mi;
+			distances[s].setFij(lij.dot(normalVec/norm2(normalVec)));
+			if (s == 0)
+			{
+				distCF.setDij(norm2(dij));
+			}
+			distCF.setFij(lij.dot(normalVec / norm2(normalVec)));
+		}
+	}
+	else
+	{
+		// Assign mij, calculate mij derivatives, assign dij and calculate dij derivatives
+		// Intersection not found
+		for (int s = 0; s < distances.size(); s++)
+		{
+			distances[s].setInterval(p_mi);
+			float lambda = offsetOut;
+			Point2f dp_mi;
+			Vec2f dvec, dij, normal, lij;
+			normal = normalOut;
+			dvec = distances[s].getEdgeDeriv(idx)[1] - distances[s].getEdgeDeriv(idx)[0];
+			dp_mi = ((float)j / (float)(mNum - 1)) * dvec;
+			dp_mi += distances[s].getEdgeDeriv(idx)[0];
+			distances[s].setIntervalDeriv(dp_mi);
+			dij.val[0] = p_mi.x + lambda * normal.val[0];
+			dij.val[1] = p_mi.y + lambda * normal.val[1];
+			distances[s].setError(norm2(dij));
+			lij = dp_mi;
+			distances[s].setFij(lij.dot(normalVec / norm2(normalVec)));
+			if (s == 0)
+			{
+				distCF.setDij(norm2(dij));
+			}
+			distCF.setFij(lij.dot(normalVec / norm2(normalVec)));
+		}
+	}
+}
+
+// Calculate new extrinsics matrix closer to the data
+void fitting(Camera& virtualCam, DistClosedForm& distCF, int edgesNum)
+{
+	distCF.setWnum(virtualCam.getParamsNum());
+	distCF.calcDijsProg(edgesNum);
+	Mat M = expMap(distCF);
+	Mat R;
+	Vec3f t;
+	decomposeEuclidean(M, R, t);
+	cout << matrixToEuler(R) * 180.f / PI << endl;
+	Mat dcamPose;
+	cameraPose(R, Mat(t), dcamPose);
+	cout << dcamPose << endl;
+			
+	Mat E = virtualCam.getExtrinsics() * dcamPose;
+	virtualCam.setExtrinsics(E);
+}
+
+// Exponential map se(3) to SE(3)
+Mat expMap(DistClosedForm &distCF)
+{
+	Mat I, R, V;
+	Mat M = Mat::zeros(4, 4, CV_32F);
+	vector <float> params = distCF.getWs();
+	Vec3f u = Vec3f(params[0], params[1], params[2]);
+	Vec3f w = Vec3f(params[3], params[4], params[5]);
+	I = Mat::eye(3, 3, CV_32F);
+	float theta = max(sqrtf(w.dot(w)), 0.0001f);
+	float a = sin(theta) / theta;
+	float thetaSQR = theta * theta;
+	float b = (1 - cos(theta)) / thetaSQR;
+	float c = (1 - a) / thetaSQR;
+
+	Mat Wx = skewMat(w);
+
+	R = I + a * Wx + b * (Wx * Wx);
+	V = I + b * Wx + c * (Wx * Wx);
+
+	Rect r(0, 0, 3, 3);
+	R.copyTo(M(r));
+	Mat Vu = V * Mat(u);
+	M.at<float>(0, 3) = Vu.at<float>(0);
+	M.at<float>(1, 3) = Vu.at<float>(1);
+	M.at<float>(2, 3) = Vu.at<float>(2);
+	M.at<float>(3, 3) = 1.f;
+
+	return M;
 }
 
 // Secondary functions declarations
@@ -839,7 +889,7 @@ void clipping(Cuboid2D &obj, int height, int width)
 				edgeVec = edgeVec / normEdgeVec;
 				// Check if the whole egde is outside the image plane
 				if (!(p1.inside(rectangle)) && !(p2.inside(rectangle)))
-				{					
+				{
 					for (int j = 0; j <= length; j++)
 					{
 						pE = edgeVec * ((float)j / (float)(length)) * normEdgeVec;
@@ -917,9 +967,9 @@ void clipping(Cuboid2D &obj, int height, int width)
 			}
 			edgePxl.clear();
 		}
-		
+
 	}
-		
+
 }
 
 // Check if a surface is being occluded by another one
@@ -955,315 +1005,5 @@ int occlusionSurf(vector <int> surface, vector <Point3f> vertices, Point3f t)
 		cout << " --> Occluded" << endl;
 #endif
 		return 1;
-	}
-}
-
-// Overload
-// Returns the Euclidean norm of a 3D vector
-float norm2(Vec3f vec)
-{
-	float norm = sqrt(powf(vec.val[0], 2.f) + powf(vec.val[1], 2.f) + powf(vec.val[2], 2.f));
-
-	return max(norm, 0.0001f);
-}
-
-// Returns the Euclidean norm of a 2D vector
-float norm2(Vec2f vec)
-{
-	return sqrt(powf(vec.val[0], 2.f) + powf(vec.val[1], 2.f));
-}
-
-// Compute euclidean distance between two points
-float euclideanDistanceSquared(Point2i p, Point2i q)
-{
-	return (powf((float)(q.x - p.x), 2.f) + powf((float)(q.y - p.y), 2.f));
-}
-
-// Keys pressed handler - case sensitive
-void keyboardHandler(Camera &virtualCam, Camera &realCam, Cuboid3D &model, Cuboid3D &Data, int &mNum, vector <State>& state, bool &exitFlag, bool &updateFlag, bool &fitFlag)
-{
-	static int primitives = 0, surface = 0, edge = 0;
-
-	switch (waitKey(0))
-	{
-		// Virtual Camera handler
-		case 119: // 'w' key pressed - tyVirtual++
-		{
-			float tyVirtual = virtualCam.getTy();
-			virtualCam.setTy(++tyVirtual);
-			updateFlag = true;
-			break;
-		}
-		case 115: // 's' key pressed - tyVirtual--
-		{
-			float tyVirtual = virtualCam.getTy();
-			virtualCam.setTy(--tyVirtual);
-			updateFlag = true;
-			break;
-		}
-		case 97: // 'a' key pressed - txVirtual--
-		{
-			float txVirtual = virtualCam.getTx();
-			virtualCam.setTx(--txVirtual);
-			updateFlag = true;
-			break;
-		}
-		case 100: // 'd' key pressed - txVirtual++
-		{
-			float txVirtual = virtualCam.getTx();
-			virtualCam.setTx(++txVirtual);
-			updateFlag = true;
-			break;
-		}
-		case 101: // 'e' key pressed - tzVirtual++
-		{
-			float tzVirtual = virtualCam.getTz();
-			virtualCam.setTz(++tzVirtual);
-			updateFlag = true;
-			break;
-		}
-		case 113: // 'q' key pressed - tzVirtual--
-		{
-			float tzVirtual = virtualCam.getTz();
-			virtualCam.setTz(--tzVirtual);
-			updateFlag = true;
-			break;
-		}
-		case 122: // 'z' key pressed - ++ryVirtual
-		{
-			float ryVirtual = virtualCam.getThetaY(DEGREES);
-			ryVirtual += 0.5f;
-			virtualCam.setThetaY(ryVirtual);
-			updateFlag = true;
-			break;
-		}
-		case 120: // 'x' key pressed - --ryVirtual
-		{
-			float ryVirtual = virtualCam.getThetaY(DEGREES);
-			ryVirtual -= 0.5f;
-			virtualCam.setThetaY(ryVirtual);
-			updateFlag = true;
-			break;
-		}
-		case 99: // 'c' key pressed - ++rxVirtual
-		{
-			float rxVirtual = virtualCam.getThetaX(DEGREES);
-			rxVirtual += 0.5f;
-			virtualCam.setThetaX(rxVirtual);
-			updateFlag = true;
-			break;
-		}
-		case 118: // 'v' key pressed - --rxVirtual
-		{
-			float rxVirtual = virtualCam.getThetaX(DEGREES);
-			rxVirtual -= 0.5f;
-			virtualCam.setThetaX(rxVirtual);
-			updateFlag = true;
-			break;
-		}
-		case 98: // 'b' key pressed - ++rzVirtual
-		{
-			float rzVirtual = virtualCam.getThetaZ(DEGREES);
-			virtualCam.setThetaZ(++rzVirtual);
-			updateFlag = true;
-			break;
-		}
-		case 110: // 'n' key pressed - --rzVirtual
-		{
-			float rzVirtual = virtualCam.getThetaZ(DEGREES);
-			virtualCam.setThetaZ(--rzVirtual);
-			updateFlag = true;
-			break;
-		}
-		// Real Camera handler
-		case 91: // '[{' key pressed - tyReal++
-		{
-			float tyReal = realCam.getTy();
-			realCam.setTy(++tyReal);
-			updateFlag = true;
-			break;
-		}
-		case 39: // '"'' key pressed - tyReal--
-		{
-			float tyReal = realCam.getTy();
-			realCam.setTy(--tyReal);
-			updateFlag = true;
-			break;
-		}
-		case 59: // ';:' key pressed - txReal--
-		{
-			float txReal = realCam.getTx();
-			realCam.setTx(--txReal);
-			updateFlag = true;
-			break;
-		}
-		case 92: // '\|' key pressed - txReal++
-		{
-			float txReal = realCam.getTx();
-			realCam.setTx(++txReal);
-			updateFlag = true;
-			break;
-		}
-		case 93: // ']}' key pressed - tzReal++
-		{
-			float tzReal = realCam.getTz();
-			realCam.setTz(++tzReal);
-			updateFlag = true;
-			break;
-		}
-		case 112: // 'p' key pressed - tzReal--
-		{
-			float tzReal = realCam.getTz();
-			realCam.setTz(--tzReal);
-			updateFlag = true;
-			break;
-		}
-		case 102: // 'f' key pressed - ++ryReal
-		{
-			float ryReal = realCam.getThetaY(DEGREES);
-			realCam.setThetaY(++ryReal);
-			updateFlag = true;
-			break;
-		}
-		case 103: // 'g' key pressed - --ryReal
-		{
-			float ryReal = realCam.getThetaY(DEGREES);
-			realCam.setThetaY(--ryReal);
-			updateFlag = true;
-			break;
-		}
-		case 104: // 'h' key pressed - ++rxReal
-		{
-			float rxReal = realCam.getThetaX(DEGREES);
-			realCam.setThetaX(++rxReal);
-			updateFlag = true;
-			break;
-		}
-		case 106: // 'j' key pressed - --rxReal
-		{
-			float rxReal = realCam.getThetaX(DEGREES);
-			realCam.setThetaX(--rxReal);
-			updateFlag = true;
-			break;
-		}
-		case 107: // 'k' key pressed - ++rzReal
-		{
-			float rzReal = realCam.getThetaZ(DEGREES);
-			realCam.setThetaZ(++rzReal);
-			updateFlag = true;
-			break;
-		}
-		case 108: // 'l' key pressed - --rzReal
-		{
-			float rzReal = realCam.getThetaZ(DEGREES);
-			realCam.setThetaZ(--rzReal);
-			updateFlag = true;
-			break;
-		}
-		case 27: // ESC key pressed - exit
-		{
-			exitFlag = true;
-			break;
-		}
-		case 13: // ENTER key pressed - start fitting
-		{
-			fitFlag = true;
-			updateFlag = true;
-			break;
-		}
-		case 32: // SPACE key pressed - set camera to default extrinsic parameters
-		{
-			vector <float> params = { TX, TY, TZ, RX, RY, RZ };
-			vector <State> defaultState = { X, Y, Z, THETAX, THETAY, THETAZ };
-			virtualCam.setParams(params, defaultState);
-			params[0] += 2.f;
-			realCam.setParams(params, defaultState);
-			updateFlag = true;
-			break;
-		}
-		case 9: // TAB key pressed - choose primitives to be rendered
-		{
-			primitives = (primitives + 1) % 3;
-			model.setPrimitives(primitives);
-			Data.setPrimitives(primitives);
-			if (primitives == 0)
-			{
-				mNum = MNUM;
-			}
-			else if ((primitives == 1) && (mNum < 5))
-			{
-				mNum = 5;
-			}
-			else if ((primitives == 2) && (mNum < 7))
-			{
-				mNum = 7;
-			}
-			updateFlag = true;
-			break;
-		}
-		case 45: // - key pressed - choose egde or surface to be rendered
-		{
-			if (primitives == 1) // surfaces
-			{
-				surface = (surface - 1) % 6;
-				model.setSurfacesRendered(surface);
-				Data.setSurfacesRendered(surface);
-				model.setEdgesRendered();
-				Data.setEdgesRendered();
-			}
-			else if (primitives == 2) // edges
-			{
-				edge = (edge - 1) % 12;
-				model.setSurfacesRendered();
-				Data.setSurfacesRendered();
-				model.setEdgesRendered(edge);
-				Data.setEdgesRendered(edge);
-			}
-			updateFlag = true;
-			break;
-		}
-		case 61: // = key pressed - choose egde or surface to be rendered
-		{
-			if (primitives == 1) // surfaces
-			{
-				surface = (surface + 1) % 6;
-				model.setSurfacesRendered(surface);
-				Data.setSurfacesRendered(surface);
-				model.setEdgesRendered();
-				Data.setEdgesRendered();
-			}
-			else if (primitives == 2) // edges
-			{
-				edge = (edge + 1) % 12;
-				model.setSurfacesRendered();
-				Data.setSurfacesRendered();
-				model.setEdgesRendered(edge);
-				Data.setEdgesRendered(edge);
-			}
-			updateFlag = true;
-			break;
-		}
-		case 126: // ` key pressed - choose number of camera parameters
-		{
-			int numParams, parameters;
-			vector <State> tmpStates;
-			cout << "Choose number of camera parameters: ";
-			cin >> numParams;
-			cout << "\n Choose which camera parameters: ";
-			for (int i = 0; i < numParams; i++)
-			{
-				cin >> parameters;
-				tmpStates.push_back((State)parameters);
-			}
-			sort(tmpStates.begin(), tmpStates.end());
-			state.clear();
-			state = tmpStates;			
-			virtualCam.setParamsNum(numParams);
-		}
-		default:
-		{
-			updateFlag = false;
-			break;
-		}
 	}
 }

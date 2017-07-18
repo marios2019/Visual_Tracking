@@ -107,6 +107,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <ForceFileOutput>MultiplyDefinedSymbolOnly</ForceFileOutput>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -141,6 +142,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <ForceFileOutput>MultiplyDefinedSymbolOnly</ForceFileOutput>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -149,17 +151,22 @@
     <ClCompile Include="class_definitions\Cuboid2D.cpp" />
     <ClCompile Include="class_definitions\Cuboid3D.cpp" />
     <ClCompile Include="class_definitions\Distance.cpp" />
+    <ClCompile Include="class_definitions\DistClosedForm.cpp" />
     <ClCompile Include="Source.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="headers\CameraStateSpace.h" />
+    <ClInclude Include="headers\controls.h" />
     <ClInclude Include="headers\Cuboid2D.h" />
     <ClInclude Include="headers\Distance.h" />
+    <ClInclude Include="headers\DistClosedForm.h" />
     <ClInclude Include="headers\projectiveGeometry.h" />
     <ClInclude Include="headers\cameraCalibration.h" />
     <ClInclude Include="headers\Camera.h" />
     <ClInclude Include="headers\Cuboid3D.h" />
     <ClInclude Include="headers\functionality.h" />
+    <ClInclude Include="headers\Rotations3D.h" />
+    <ClInclude Include="headers\utility.h" />
     <ClInclude Include="headers\visualTracking.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

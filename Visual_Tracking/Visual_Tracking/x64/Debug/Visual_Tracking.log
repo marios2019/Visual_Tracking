@@ -1,10 +1,19 @@
-﻿  Distance.cpp
-  Cuboid3D.cpp
-  Cuboid2D.cpp
-  CameraStateSpace.cpp
-  Camera.cpp
-  Source.cpp
-  Generating Code...
-  LINK : D:\MegaSync\ΜΕΠ\GitHub Repos\Visual_Tracking\Visual_Tracking\x64\Debug\Visual_Tracking.exe not found or not built by the last incremental link; performing full link
-  Visual_Tracking.vcxproj -> D:\MegaSync\ΜΕΠ\GitHub Repos\Visual_Tracking\Visual_Tracking\x64\Debug\Visual_Tracking.exe
-  Visual_Tracking.vcxproj -> D:\MegaSync\ΜΕΠ\GitHub Repos\Visual_Tracking\Visual_Tracking\x64\Debug\Visual_Tracking.pdb (Full PDB)
+﻿  Source.cpp
+LINK : warning LNK4075: ignoring '/INCREMENTAL' due to '/FORCE' specification
+Camera.obj : warning LNK4075: ignoring '/EDITANDCONTINUE' due to '/OPT:LBR' specification
+Source.obj : warning LNK4006: "bool __cdecl IsRotationMatrix(class cv::Mat)" (?IsRotationMatrix@@YA_NVMat@cv@@@Z) already defined in Camera.obj; second definition ignored
+Source.obj : warning LNK4006: "void __cdecl cameraPose(class cv::Mat,class cv::Mat,class cv::Mat &)" (?cameraPose@@YAXVMat@cv@@0AEAV12@@Z) already defined in Camera.obj; second definition ignored
+Source.obj : warning LNK4006: "void __cdecl decomposeCameraPose(class cv::Mat,class cv::Mat &,class cv::Vec<float,3> &)" (?decomposeCameraPose@@YAXVMat@cv@@AEAV12@AEAV?$Vec@M$02@2@@Z) already defined in Camera.obj; second definition ignored
+Source.obj : warning LNK4006: "void __cdecl decomposeEuclidean(class cv::Mat,class cv::Mat &,class cv::Vec<float,3> &)" (?decomposeEuclidean@@YAXVMat@cv@@AEAV12@AEAV?$Vec@M$02@2@@Z) already defined in Camera.obj; second definition ignored
+Source.obj : warning LNK4006: "float __cdecl euclideanDistanceSquared(class cv::Point_<int>,class cv::Point_<int>)" (?euclideanDistanceSquared@@YAMV?$Point_@H@cv@@0@Z) already defined in Camera.obj; second definition ignored
+Source.obj : warning LNK4006: "class cv::Mat __cdecl getRotationEuler(float,float,float)" (?getRotationEuler@@YA?AVMat@cv@@MMM@Z) already defined in Camera.obj; second definition ignored
+Source.obj : warning LNK4006: "class cv::Mat __cdecl getRotationX(float)" (?getRotationX@@YA?AVMat@cv@@M@Z) already defined in Camera.obj; second definition ignored
+Source.obj : warning LNK4006: "class cv::Mat __cdecl getRotationY(float)" (?getRotationY@@YA?AVMat@cv@@M@Z) already defined in Camera.obj; second definition ignored
+Source.obj : warning LNK4006: "class cv::Mat __cdecl getRotationZ(float)" (?getRotationZ@@YA?AVMat@cv@@M@Z) already defined in Camera.obj; second definition ignored
+Source.obj : warning LNK4006: "class cv::Vec<float,3> __cdecl matrixToEuler(class cv::Mat)" (?matrixToEuler@@YA?AV?$Vec@M$02@cv@@VMat@2@@Z) already defined in Camera.obj; second definition ignored
+Source.obj : warning LNK4006: "float __cdecl norm2(class cv::Vec<float,2>)" (?norm2@@YAMV?$Vec@M$01@cv@@@Z) already defined in Camera.obj; second definition ignored
+Source.obj : warning LNK4006: "float __cdecl norm2(class cv::Vec<float,3>)" (?norm2@@YAMV?$Vec@M$02@cv@@@Z) already defined in Camera.obj; second definition ignored
+Source.obj : warning LNK4006: "class cv::Mat __cdecl skewMat(class cv::Vec<float,3>)" (?skewMat@@YA?AVMat@cv@@V?$Vec@M$02@2@@Z) already defined in Camera.obj; second definition ignored
+C:\Users\marios\Documents\MEGAsync\ΜΕΠ\GitHub Repos\Visual_Tracking\Visual_Tracking\x64\Debug\Visual_Tracking.exe : warning LNK4088: image being generated due to /FORCE option; image may not run
+  Visual_Tracking.vcxproj -> C:\Users\marios\Documents\MEGAsync\ΜΕΠ\GitHub Repos\Visual_Tracking\Visual_Tracking\x64\Debug\Visual_Tracking.exe
+  Visual_Tracking.vcxproj -> C:\Users\marios\Documents\MEGAsync\ΜΕΠ\GitHub Repos\Visual_Tracking\Visual_Tracking\x64\Debug\Visual_Tracking.pdb (Full PDB)
