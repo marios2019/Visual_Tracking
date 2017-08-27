@@ -2,29 +2,19 @@
 
 // CameraStateSpace class definition
 
-// Empty Constructor
-CameraStateSpace::CameraStateSpace()
-{
-	// Parameters initialization
-	tX = 0.f;
-	tY = 0.f;
-	tZ = 0.f;
-	thetaX = 0.f;
-	thetaY = 0.f;
-	thetaZ = 0.f;
-}
-
 // Constructor
-CameraStateSpace::CameraStateSpace(float tXVal, float tYVal, float tZVal, float thetaXVal, float thetaYVal, float thetaZVal, int paramsNumVal)
+CameraStateSpace::CameraStateSpace(float tXVal, float tYVal, float tZVal, float thetaXVal, float thetaYVal, float thetaZVal, vector <State> stateVal)
 {
 	// Parameters initialization
 	tX = tXVal;
 	tY = tYVal;
 	tZ = tZVal;
-	thetaX = thetaXVal * PI / 180.f;
-	thetaY = thetaYVal * PI / 180.f;
-	thetaZ = thetaZVal * PI / 180.f;
-	parametersNum = paramsNumVal;
+	thetaX = fmod(thetaXVal, DEG) * PI / 180.f;
+	thetaY = fmod(thetaYVal, DEG) * PI / 180.f;
+	thetaZ = fmod(thetaZVal, DEG) * PI / 180.f;
+	checkStateSize(stateVal.size());
+	state = stateVal;
+	sort(state.begin(), state.end());
 }
 
 // Destructor
@@ -69,85 +59,98 @@ float CameraStateSpace::getTz() const
 }
 
 // Change x-axis rotation
-void CameraStateSpace::setThetaX(float thetaXVal)
+void CameraStateSpace::setThetaX(float thetaXVal, Angle angle)
 {
-	thetaX = thetaXVal * PI / 180.f;
+	// Degrees
+	if (angle == DEGREES)
+	{
+		thetaX = fmod(thetaXVal, DEG) * PI / 180.f;
+		return;
+	}
+
+	// Radians
+	thetaX = fmod(thetaXVal, 2.f * PI);
 }
 
 // Change y-axis rotation
-void CameraStateSpace::setThetaY(float thetaYVal)
+void CameraStateSpace::setThetaY(float thetaYVal, Angle angle)
 {
-	thetaY = thetaYVal * PI / 180.f;
+	// Degrees
+	if (angle == DEGREES)
+	{
+		thetaY = fmod(thetaYVal, DEG) * PI / 180.f;
+		return;
+	}
+
+	// Radians
+	thetaY = fmod(thetaYVal, 2.f * PI);
 }
 
 // Change z-axis rotation
-void CameraStateSpace::setThetaZ(float thetaZVal)
+void CameraStateSpace::setThetaZ(float thetaZVal, Angle angle)
 {
-	thetaZ = thetaZVal * PI / 180.f;
+	// Degrees
+	if (angle == DEGREES)
+	{
+		thetaZ = fmod(thetaZVal, DEG) * PI / 180.f;
+		return;
+	}
+
+	// Radians
+	thetaZ = fmod(thetaZVal, 2.f * PI);
 }
 
 // Return x-axis rotation
-float CameraStateSpace::getThetaX(Type type) const
+float CameraStateSpace::getThetaX(Angle angle) const
 {
-	if (type == DEGREES)
+	// Degrees
+	if (angle == DEGREES)
 	{
 		return thetaX * 180.f / PI;
 	}
-	else if (type = RADIANS)
-	{
-		return thetaX;
-	}
-	else
-	{
-		cout << "Metric unit must be in DEGREES or RADIANS" << endl;
-		exit(EXIT_FAILURE);
-	}
+
+	// Radians
+	return thetaX;
 }
 
 // Return y-axis rotation
-float CameraStateSpace::getThetaY(Type type) const
+float CameraStateSpace::getThetaY(Angle angle) const
 {
-	if (type == DEGREES)
+	// Degrees
+	if (angle == DEGREES)
 	{
 		return thetaY * 180.f / PI;
 	}
-	else if (type == RADIANS)
-	{
-		return thetaY;
-	}
-	else
-	{
-		cout << "Metric unit must be in DEGREES or RADIANS" << endl;
-		exit(EXIT_FAILURE);
-	}
+	
+	// Radians
+	return thetaY;
 }
 
 // Return z-axis rotation
-float CameraStateSpace::getThetaZ(Type type) const
+float CameraStateSpace::getThetaZ(Angle angle) const
 {
-	if (type == DEGREES)
+	// Degrees
+	if (angle == DEGREES)
 	{
 		return thetaZ * 180.f / PI;
 	}
-	else if (type == RADIANS)
-	{
-		return thetaZ;
-	}
-	else
-	{
-		cout << "Metric unit must be in DEGREES or RADIANS" << endl;
-		exit(EXIT_FAILURE);
-	}
+
+	// Radians
+	return thetaZ;
 }
 
-// Get camera parameters
+// Get specific camera parameters values
 vector <float> CameraStateSpace::getParams(vector <State> stateVal)
 {
 	vector <float> params;
-	for (int i = 0; i < stateVal.size(); i++)
+	sort(stateVal.begin(), stateVal.end());
+
+	for (int i = 0; i < state.size(); i++)
 	{
-		switch (stateVal[i])
+		if (getState(i) == stateVal[i])
 		{
+			switch (stateVal[i])
+			{
 			case X:
 				params.push_back(getTx());
 				break;
@@ -165,26 +168,62 @@ vector <float> CameraStateSpace::getParams(vector <State> stateVal)
 				break;
 			case THETAZ:
 				params.push_back(getThetaZ(DEGREES));
-				break;				
+				break;
 			default:
 				break;
+			}
+		}
+		else
+		{
+			cout << "Parameter " << stateVal[i] << " is disabled." << endl;
 		}
 	}
 
 	return params;
 }
 
-// Set the parameters number
-void CameraStateSpace::setParamsNum(int paramsNumVal)
+// Get all camera parameters values
+vector <float> CameraStateSpace::getParams()
 {
-	if (paramsNumVal > 0)
-	{
-		parametersNum = paramsNumVal;
-	}
+	return getParams(state);
 }
 
-// Return the number of camera parameters
-int CameraStateSpace::getParamsNum() const
+// Enable state parameters
+void CameraStateSpace::setState(vector <State> stateVal)
 {
-	return parametersNum;
+	// Check size
+	checkStateSize(stateVal.size());
+	state.clear();
+	state = stateVal;
+	sort(state.begin(), state.end());
+}
+
+// Get specific state parameter
+State CameraStateSpace::getState(int idx)
+{
+	// Check if idx is valid
+	checkIdx("CameraStateSpace::state", idx, state.size());
+
+	return state[idx];
+}
+
+// Get all state parameters
+vector <State> CameraStateSpace::getStates() const
+{
+	return state;
+}
+
+// Get state parameters size
+int CameraStateSpace::getStateSize() const
+{
+	return static_cast<int>(state.size());
+}
+
+// Check state parameters size
+void CameraStateSpace::checkStateSize(size_t size)
+{
+	if ((size == 0) && (size > 6))
+	{
+		errorExit("CameraStateSpace::state", 6, LIMIT);
+	}	
 }

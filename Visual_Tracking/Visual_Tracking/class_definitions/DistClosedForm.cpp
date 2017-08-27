@@ -15,14 +15,14 @@ DistClosedForm::~DistClosedForm()
 // Set dij
 void DistClosedForm::setDij(float dijVal)
 {
-	dij.push_back(dijVal);
+	dij.push_back(abs(dijVal));
 }
 
 // Get dij
 float DistClosedForm::getDij(int idx)
 {
 	// Check if idx is valid
-	checkIdx(idx, dij.size());
+	checkIdx("DistClosedForm::dij", idx, dij.size());
 
 	return dij[idx];
 }
@@ -31,6 +31,12 @@ float DistClosedForm::getDij(int idx)
 vector <float> DistClosedForm::getDijs() const
 {
 	return dij;
+}
+
+// Get dijs vector size
+size_t DistClosedForm::getDijsSize() const
+{
+	return dij.size();
 }
 
 // Set fij
@@ -43,7 +49,7 @@ void DistClosedForm::setFij(float fijVal)
 float DistClosedForm::getFij(int idx)
 {
 	// Check if idx is valid
-	checkIdx(idx, fij.size());
+	checkIdx("DistClosedForm::fij", idx, fij.size());
 
 	return fij[idx];
 }
@@ -54,17 +60,23 @@ vector<float> DistClosedForm::getFijs() const
 	return fij;
 }
 
-// Calculate dijsProg
-void DistClosedForm::calcDijsProg(int edgesNum)
+// Get fijs vector size
+size_t DistClosedForm::getFijsSize() const
 {
-	if (getWnum() >= 0)
+	return fij.size();
+}
+
+// Calculate fijs linear combination coefficients
+void DistClosedForm::calcFijWeights(int edgesNum, int wnum)
+{
+	if (getWnum() > 0)
 	{
-		Mat Fij = Mat(edgesNum, getWnum(), CV_32F);
+		Mat Fij = Mat(wnum * edgesNum, getWnum(), CV_32F);
 		Mat dij = Mat((int)getDijs().size(), 1, CV_32F);
-		Mat W = Mat(getWnum(), 1, CV_32F);
+		Mat w = Mat(getWnum(), 1, CV_32F);
 
 		// Initialise Fij
-		for (int i = 0; i < edgesNum; i++)
+		for (int i = 0; i < edgesNum * wnum; i++)
 		{
 			for (int j = 0; j < getWnum(); j++)
 			{
@@ -75,13 +87,13 @@ void DistClosedForm::calcDijsProg(int edgesNum)
 		// Initialise dij
 		memcpy(dij.data, getDijs().data(), getDijs().size() * sizeof(float));
 
-		// Calculate w
+		// Calculate weights
 		Mat FijInverse;
 		invert(Fij.t() * Fij, FijInverse);
-		W = FijInverse * Fij.t() * dij;
+		w = FijInverse * Fij.t() * dij;
 		for (int i = 0; i < getWnum(); i++)
 		{
-			w.push_back(W.at<float>(i));
+			this->w.push_back(w.at<float>(i));
 		}
 	}
 	else
@@ -91,31 +103,16 @@ void DistClosedForm::calcDijsProg(int edgesNum)
 	}
 }
 
-// Get dijProg
-float DistClosedForm::getDijProg(int idx)
-{
-	// Check if idx is valid
-	checkIdx(idx, dijProg.size());
-
-	return dijProg[idx];
-}
-
-// Get dijsProg
-vector<float> DistClosedForm::getDijsProg() const
-{
-	return dijProg;
-}
-
-// Get w
+// Get weight
 float DistClosedForm::getW(int idx)
 {
 	// Check if idx is valid
-	checkIdx(idx, w.size());
+	checkIdx("DistClosedForm::w", idx, w.size());
 
 	return w[idx];
 }
 
-// Get ws
+// Get weights
 vector<float> DistClosedForm::getWs() const
 {
 	return w;
@@ -127,12 +124,11 @@ void DistClosedForm::setWnum(int wNumVal)
 	if (wNumVal >= 0)
 	{
 		wNum = wNumVal;
+		return;
 	}
-	else
-	{
-		cout << "wNum must be a positive integer." << endl;
-		exit(EXIT_FAILURE);
-	}
+	
+	cout << "wNum must be a positive integer." << endl;
+	return;
 }
 
 // Get wNum
@@ -141,14 +137,11 @@ int DistClosedForm::getWnum() const
 	return wNum;
 }
 
-// Check for invalid memory access
-void DistClosedForm::checkIdx(int idx, size_t limit)
+// Clear all data
+void DistClosedForm::Reset()
 {
-	if ((idx >= limit) || (idx < 0))
-	{
-		cout << "ERROR, invalid memory access." << endl;
-		exit(EXIT_FAILURE);
-	}
+	dij.clear();
+	fij.clear();
+	w.clear();
+	wNum = -1;
 }
-
-

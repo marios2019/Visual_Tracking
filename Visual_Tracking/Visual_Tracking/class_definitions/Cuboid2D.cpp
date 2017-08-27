@@ -2,13 +2,6 @@
 
 // Cuboid2D class definition
 
-// Empty contructor
-Cuboid2D::Cuboid2D()
-{
-	cout << "Incompatible homogeneous vertices vector size (size = 8 is mandatory).";
-	exit(EXIT_FAILURE);
-}
-
 // Constructor
 Cuboid2D::Cuboid2D(vector <Point3f> homoVerticesVal)
 {
@@ -22,14 +15,12 @@ Cuboid2D::Cuboid2D(vector <Point3f> homoVerticesVal)
 	homogeneousVertices = homoVerticesVal;
 
 	// VerticesPixel and verticesVisibility initialization
-	Point2f tmp;
-	Point2f verticePixel;
+	Point2f vertexPixel;
 	for (int i = 0; i < homogeneousVertices.size(); i++)
 	{
-		tmp.x = homogeneousVertices[i].x / homogeneousVertices[i].z;
-		tmp.y = homogeneousVertices[i].y / homogeneousVertices[i].z;
-		verticePixel = tmp;
-		verticesPixel.push_back(verticePixel);
+		vertexPixel.x = homogeneousVertices[i].x / homogeneousVertices[i].z;
+		vertexPixel.y = homogeneousVertices[i].y / homogeneousVertices[i].z;
+		verticesPixel.push_back(vertexPixel);
 	}
 }
 
@@ -38,11 +29,11 @@ Cuboid2D::~Cuboid2D()
 {
 }
 
-// Returns a vertice of the Cuboid2D
-Point3f Cuboid2D::getHomogeneousVertice(int idx)
+// Returns a vertex of the Cuboid2D
+Point3f Cuboid2D::getHomogeneousVertex(int idx)
 {
 	// Check if idx is between 0..VERTICES=8
-	checkIdx(idx, VERTICES);
+	checkIdx("Cuboid2D::homogeneousVertices", idx, VERTICES);
 
 	return homogeneousVertices[idx];
 }
@@ -62,6 +53,13 @@ int Cuboid2D::getHomogeneousVerticesSize() const
 // Set edge to be rendered
 void Cuboid2D::setEdge(vector <Point2f> edgeVal)
 {
+	for (int i = 0; i < edges.size(); i++)
+	{
+		if (edges[i] == edgeVal)
+		{
+			return;
+		}
+	}
 	edges.push_back(edgeVal);
 }
 
@@ -69,7 +67,7 @@ void Cuboid2D::setEdge(vector <Point2f> edgeVal)
 void Cuboid2D::setEdge(vector <Point2f> edge, int idx)
 {
 	// Check if idx is valid
-	checkIdx(idx, (int)edges.size());
+	checkIdx("Cuboid2D::edges", idx, edges.size());
 
 	edges[idx] = edge;
 }
@@ -78,16 +76,17 @@ void Cuboid2D::setEdge(vector <Point2f> edge, int idx)
 void Cuboid2D::destroyEdge(int idx)
 {
 	// Check if idx is valid
-	checkIdx(idx, (int)edges.size());
+	checkIdx("Cuboid2D::edges", idx, edges.size());
 
-	edges.erase(edges.begin() + idx);
+	edges[idx].swap(edges.back());
+	edges.pop_back();
 }
 
 // Returns an edge of the Cuboid2D
 vector <Point2f> Cuboid2D::getEdge(int idx)
 {
 	// Check if idx is valid
-	checkIdx(idx, (int) edges.size());
+	checkIdx("Cuboid2D::edges", idx, (int) edges.size());
 	
 	return edges[idx];
 }
@@ -114,7 +113,7 @@ void Cuboid2D::setSurface(vector <int> surfaceVal)
 vector <int> Cuboid2D::getSurface(int idx)
 {
 	// Check if idx is valid
-	checkIdx(idx, (int) surfaces.size());
+	checkIdx("Cuboid2D::surfaces", idx, surfaces.size());
 
 	return surfaces[idx];
 }
@@ -138,19 +137,19 @@ void Cuboid2D::setVerticesPxl(vector <Point2f> verticesPixelVal)
 }
 
 // Change vertexPixel[idx] value
-void Cuboid2D::setVertexPxl(int idx, Point2f verticePixelVal)
+void Cuboid2D::setVertexPxl(Point2f vertexPixelVal, int idx)
 {
 	// Check if idx is valid
-	checkIdx(idx, verticesPixel.size());
+	checkIdx("Cuboid2D::verticesPixel", idx, verticesPixel.size());
 
-	verticesPixel[idx] = verticePixelVal;
+	verticesPixel[idx] = vertexPixelVal;
 }
 
 // Returns a vertex of the Cuboid2D, in pixel coordinates 
 Point2f Cuboid2D::getVertexPxl(int idx)
 {
 	// Check if idx is valid
-	checkIdx(idx, verticesPixel.size());
+	checkIdx("Cuboi2D::verticesPixel", idx, verticesPixel.size());
 
 	return verticesPixel[idx];
 }
@@ -165,15 +164,4 @@ vector <Point2f> Cuboid2D::getVerticesPxl() const
 size_t Cuboid2D::getVerticesPxlSize() const
 {
 	return verticesPixel.size();
-}
-
-bool Cuboid2D::checkIdx(int idx, size_t limit)
-{
-	if ((idx >= limit) || (idx < 0))
-	{
-		cout << "ERROR, invalid memory access." << endl;
-		exit(EXIT_FAILURE);
-	}
-	
-	return true;
 }

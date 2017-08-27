@@ -6,4 +6,3 @@
 #include "Cuboid2D.h"
 #include "Distance.h"
 #include "DistClosedForm.h"
-#include "utility.h"

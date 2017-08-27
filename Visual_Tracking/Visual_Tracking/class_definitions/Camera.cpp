@@ -1,23 +1,14 @@
 #include "..\headers\Camera.h"
 
-Camera::Camera() : CameraStateSpace() // Empty constructor
-{
-	// Intrinsics initialization
-	principalPoint = Point2f();
-	fov = 0.f;
-	focal = 0.f;
-}
-
-Camera::Camera(Vec3f tVal, Vec3f rVal, Point2f principalVal, float fovVal, float focalVal, size_t paramsNumVal) // Constructor
-	: CameraStateSpace(tVal.val[0], tVal.val[1], tVal.val[2], rVal[0], rVal[1], rVal[2], (int) paramsNumVal)
+Camera::Camera(Vec3f tVal, Vec3f rVal, Point2f principalVal, float fovVal, float focalPixelsVal, vector <State> stateVal) // Constructor
+	: CameraStateSpace(tVal.val[0], tVal.val[1], tVal.val[2], rVal.val[0], rVal.val[1], rVal.val[2], stateVal)
 {
 	// Intrinsics initialization
 	principalPoint = principalVal;
-	fov = fovVal;
-	focal = focalVal;
-	
-	// Set rotation matrix
-	R = getRotationEuler(getThetaX(RADIANS), getThetaY(RADIANS), getThetaZ(RADIANS));
+	fov = fmod(fmod(fovVal, DEG) + DEG, DEG);
+	focalPixels = checkFocal(focalPixelsVal);
+	focalMetric = focalPixelsVal / K;
+	width = static_cast<int>(2.f * focalPixelsVal * tan(deg2rad(fovVal / 2.f)));
 }
 
 Camera::~Camera()
@@ -39,7 +30,9 @@ Point2f Camera::getPrincipal() const
 // Change fov
 void Camera::setFov(float fovVal)
 {
-	fov = fovVal;
+	fov = fmod(fmod(fovVal, DEG) + DEG, DEG);
+	focalPixels = static_cast<float>(width) / (2.f * tan(deg2rad(fov / 2.f)));
+	focalMetric = focalPixels / K;
 }
 
 // Return fov
@@ -48,16 +41,32 @@ float Camera::getFov() const
 	return fov;
 }
 
-// Change focal length
-void Camera::setFocal(float focalVal)
+// Change focalPixels
+void Camera::setFocalPixels(float focalPixelsVal)
 {
-	focal = focalVal;
+	focalPixels = checkFocal(focalPixelsVal);
+	focalMetric = focalPixels / K;
+	fov = 2.f * rad2deg(atan2f(static_cast<float>(width), 2.f * focalPixels));
 }
 
-// Return focal length
-float Camera::getFocal() const
+// Return focalPixels
+float Camera::getFocalPixels() const
 {
-	return focal;
+	return focalPixels;
+}
+
+// Change focalMetric
+void Camera::setFocalMetric(float focalMetricVal)
+{
+	focalMetric = checkFocal(focalMetricVal);
+	focalPixels = K * focalMetric;
+	fov = 2.f * rad2deg(atan2f(static_cast<float>(width), 2.f * focalPixels));
+}
+
+// Return focalMetric
+float Camera::getFocalMetric() const
+{
+	return focalMetric;
 }
 
 // Change camera position
@@ -79,7 +88,10 @@ void Camera::setRotation(Mat RVal)
 {
 	if (IsRotationMatrix(RVal))
 	{
-		RVal.copyTo(R);
+		Vec3f eulerAngles(matrix2euler(RVal));
+		setThetaX(eulerAngles.val[0], RADIANS);
+		setThetaY(eulerAngles.val[1], RADIANS);
+		setThetaZ(eulerAngles.val[2], RADIANS);
 	}
 	else
 	{
@@ -90,60 +102,7 @@ void Camera::setRotation(Mat RVal)
 // Return rotation matrix
 Mat Camera::getRotation() const
 {
-	return R;
-}
-
-// Set thetaX value
-void Camera::setThetaX(float thetaXVal)
-{
-	CameraStateSpace::setThetaX(thetaXVal);
-	// Update rotation matrix
-	setRotation(getRotationEuler(getThetaX(RADIANS), getThetaY(RADIANS), getThetaZ(RADIANS)));
-}
-
-// Set thetaY value
-void Camera::setThetaY(float thetaYVal)
-{
-	CameraStateSpace::setThetaY(thetaYVal);
-	// Update rotation matrix
-	setRotation(getRotationEuler(getThetaX(RADIANS), getThetaY(RADIANS), getThetaZ(RADIANS)));
-}
-
-// Set thetaZ value
-void Camera::setThetaZ(float thetaZVal)
-{
-	CameraStateSpace::setThetaZ(thetaZVal);
-	// Update rotation matrix
-	setRotation(getRotationEuler(getThetaX(RADIANS), getThetaY(RADIANS), getThetaZ(RADIANS)));
-}
-
-// Return camera intrinsics matrix
-Mat Camera::getIntrinsics() const
-{
-	return (Mat_<float>(3, 3) << focal, 0, principalPoint.x, 0, focal, principalPoint.y, 0, 0, 1);
-}
-
-// Return camera extrinsics matrix
-Mat Camera::getExtrinsics()
-{
-	setExtrinsics();
-
-	return E;
-}
-
-// Set camera extrinsics matrix
-void Camera::setExtrinsics()
-{
-	// Trasnpose Rotation Matrix
-	Mat Rt;
-	transpose(getRotation(), Rt);
-	// Trasnpose Rotation Matrix multiplied by vector T - camera position
-	Mat tmp = -Rt * Mat(getPosition());
-	Vec3f RtT = Vec3f(tmp);
-	// Camera extrinsics
-	Mat E = (Mat_<float>(3, 4) << Rt.at<float>(0, 0), Rt.at<float>(0, 1), Rt.at<float>(0, 2), RtT[0], Rt.at<float>(1, 0), Rt.at<float>(1, 1), Rt.at<float>(1, 2), RtT[1], Rt.at<float>(2, 0), Rt.at<float>(2, 1), Rt.at<float>(2, 2), RtT[2]);
-
-	E.copyTo(this->E);
+	return rotationEuler(getThetaX(RADIANS), getThetaY(RADIANS), getThetaZ(RADIANS));
 }
 
 // Set camera extrinsics matrix - overload
@@ -152,32 +111,44 @@ void Camera::setExtrinsics(Mat EVal)
 	Mat R;
 	Vec3f t;
 	decomposeCameraPose(EVal, R, t);
-	setTx(t.val[0]);
-	setTy(t.val[1]);
-	setTz(t.val[2]);
-
+	
 	if (IsRotationMatrix(R))
 	{
-		Vec3f eulerAngles(matrixToEuler(R));
-		CameraStateSpace::setThetaX(eulerAngles.val[0]);
-		CameraStateSpace::setThetaY(eulerAngles.val[1]);
-		CameraStateSpace::setThetaZ(eulerAngles.val[2]);
-		setRotation(getRotationEuler(getThetaX(RADIANS), getThetaY(RADIANS), getThetaZ(RADIANS)));
+		// Update camera position and orientation
+		setRotation(R);
+		setPosition(t);
 	}
 	else
 	{
 		cout << "The input matrix must contain a 3D rotation matrix at the upper left region." << endl;
+		return;
 	}
+}
+
+// Return camera intrinsics matrix
+Mat Camera::getIntrinsics() const
+{
+	return (Mat_<float>(3, 3) << focalPixels, 0.f, principalPoint.x, 0.f, focalPixels, principalPoint.y, 0.f, 0.f, 1.f);
+}
+
+// Return camera extrinsics matrix
+Mat Camera::getExtrinsics()
+{
+	// Trasnpose Rotation Matrix
+	Mat Rt;
+	transpose(getRotation(), Rt);
+	// Trasnpose Rotation Matrix multiplied by vector T - camera position
+	Mat tmp = -Rt * Mat(getPosition());
+	Vec3f RtT = Vec3f(tmp);
+	// Camera extrinsics
+	return (Mat_<float>(3, 4) << Rt.at<float>(0, 0), Rt.at<float>(0, 1), Rt.at<float>(0, 2), RtT[0], Rt.at<float>(1, 0), Rt.at<float>(1, 1), Rt.at<float>(1, 2), RtT[1], Rt.at<float>(2, 0), Rt.at<float>(2, 1), Rt.at<float>(2, 2), RtT[2]);
 }
 
 // Return projection first derivative with respect of the i-th
 // se(3) Lie algebra generator.
-Mat Camera::getProjectionDerivative(int idx) const
+Mat Camera::getLieAlgebraDerivative(int idx)
 {
-	Mat dP;
-	
-	dP = getIntrinsics() * E * getGenerator(idx);
-	return dP;
+	return getIntrinsics() * getExtrinsics() * getGenerator(idx);
 }
 
 // Get i-th se(3) Lie algebra generator
@@ -186,7 +157,7 @@ Mat Camera::getGenerator(int idx) const
 	if ((idx > 5) || (idx < 0))
 	{
 		cout << "se(3) Lie algebra contains only six generators." << endl;
-		exit(EXIT_FAILURE);
+		return Mat();
 	}
 
 	Mat G = Mat::zeros(Size(4, 4), CV_32F);
@@ -194,35 +165,35 @@ Mat Camera::getGenerator(int idx) const
 	{
 		case 0: // generator - derivative with respect of tx at identity transformation
 		{
-			G.at<float>(0, 3) = 1;
+			G.at<float>(0, 3) = 1.f;
 			break;
 		}
 		case 1: // generator - derivative with respect of ty at identity transformation
 		{
-			G.at<float>(1, 3) = 1;
+			G.at<float>(1, 3) = 1.f;
 			break;
 		}
 		case 2: // generator - derivative with respect of tz at identity transformation
 		{
-			G.at<float>(2, 3) = 1;
+			G.at<float>(2, 3) = 1.f;
 			break;
 		}
 		case 3: // generator - derivative with respect of thetax at identity transformation
 		{
-			G.at<float>(1, 1) = -1;
-			G.at<float>(2, 0) = 1;
+			G.at<float>(1, 2) = -1.f;
+			G.at<float>(2, 1) = 1.f;
 			break;
 		}
 		case 4: // generator - derivative with respect of thetay at identity transformation
 		{
-			G.at<float>(0, 2) = 1;
-			G.at<float>(2, 0) = -1;
+			G.at<float>(0, 2) = 1.f;
+			G.at<float>(2, 0) = -1.f;
 			break;
 		}
 		case 5: // generator - derivative with respect of thetaz at identity transformation
 		{
-			G.at<float>(0, 1) = -1;
-			G.at<float>(1, 0) = 1;
+			G.at<float>(0, 1) = -1.f;
+			G.at<float>(1, 0) = 1.f;
 			break;
 		}
 	}
@@ -231,12 +202,18 @@ Mat Camera::getGenerator(int idx) const
 }
 
 // Set camera parameters
-void Camera::setParams(vector <float> paramsVal, vector <State> stateVal)
+void Camera::setParams(vector <float> paramsVal, vector <State> stateVal, Angle angle)
 {
 	if (stateVal.size() > 6)
 	{
-		cout << "Up to 6 state parameters are allowed!" << endl;
-		exit(EXIT_FAILURE);
+		cout << "Up to 6 state parameters are allowed." << endl;
+		return;
+	}
+
+	if (stateVal.size() != paramsVal.size())
+	{
+		cout << "Parameters values and states STL vectors must be of the same size." << endl;
+		return;
 	}
 
 	for (int i = 0; i < stateVal.size(); i++)
@@ -253,16 +230,28 @@ void Camera::setParams(vector <float> paramsVal, vector <State> stateVal)
 			setTz(paramsVal[i]);
 			break;
 		case THETAX:
-			setThetaX(paramsVal[i]);
+			setThetaX(paramsVal[i], angle);
 			break;
 		case THETAY:
-			setThetaY(paramsVal[i]);
+			setThetaY(paramsVal[i], angle);
 			break;
 		case THETAZ:
-			setThetaZ(paramsVal[i]);
+			setThetaZ(paramsVal[i], angle);
 			break;
 		default:
 			break;
 		}
 	}
+}
+
+// Check if focal length has non negative value
+float Camera::checkFocal(float focalVal)
+{
+	if (focalVal < 0.f)
+	{
+		cout << "Focal length has to be a positive float; value has changed from negative to positive." << endl;
+		return -focalVal;
+	}
+
+	return focalVal;
 }

@@ -27,7 +27,7 @@ void Distance::setVertexDeriv(Point3f vertexDerivVal, Point3f homogeneousVal)
 Point3f Distance::getVertexDeriv(int idx)
 {
 	// Check if idx is between 0..VERTICES=8
-	checkIdx(idx, VERTICES);
+	checkIdx("Distance::verticesDerivatives", idx, VERTICES);
 
 	return verticesDerivatives[idx];
 }
@@ -48,19 +48,19 @@ int Distance::getVerticesDerivSize() const
 Point2f Distance::getPxlDeriv(int idx)
 {
 	// Check if idx is valid
-	checkIdx(idx, pixelDerivatives.size());
+	checkIdx("Distance::pixelDerivatives", idx, pixelDerivatives.size());
 
 	return pixelDerivatives[idx];
 }
 
 // Returns a vector of cuboid2d vertices derivatives, in pixel coordinates
-vector <Point2f> Distance::getPxlDeriv() const
+vector <Point2f> Distance::getPxlsDeriv() const
 {
 	return pixelDerivatives;
 }
 
 // Returns the number of pixelDerivatives
-size_t Distance::getPxlDerivSize() const
+size_t Distance::getPxlsDerivSize() const
 {
 	return pixelDerivatives.size();
 }
@@ -75,7 +75,7 @@ void Distance::setEdgeDeriv(vector <Point2f> edgeDerivVal)
 vector <Point2f> Distance::getEdgeDeriv(int idx)
 {
 	// Check if idx is valid
-	checkIdx(idx, edgesDerivatives.size());
+	checkIdx("Distance::edgesDerivatives", idx, edgesDerivatives.size());
 	
 	return edgesDerivatives[idx];
 }
@@ -102,7 +102,7 @@ void Distance::setInterval(Point2f mijVal)
 Point2f Distance::getInterval(int idx)
 {
 	// Check if idx is valid
-	checkIdx(idx, mij.size());
+	checkIdx("Distance::mij", idx, mij.size());
 
 	return mij[idx];
 }
@@ -129,7 +129,7 @@ void Distance::setIntervalDeriv(Point2f mijDerivativeVal)
 Point2f Distance::getIntervalDeriv(int idx)
 {
 	// Check if idx is valid
-	checkIdx(idx, mijDerivatives.size());
+	checkIdx("Distance::mijDerivatives", idx, mijDerivatives.size());
 
 	return mijDerivatives[idx];
 }
@@ -140,31 +140,25 @@ vector <Point2f> Distance::getIntervalsDeriv() const
 	return mijDerivatives;
 }
 
-// Set fij
-void Distance::setFij(float fijVal)
+// Return the number of mij derivatives
+size_t Distance::getIntervalsDerivSize() const
 {
-	fij.push_back(fijVal);
-}
-
-// Get fij
-float Distance::getFij(int idx)
-{
-	// Check if idx is valid
-	checkIdx(idx, fij.size());
-
-	return fij[idx];
-}
-
-// Get all fijs
-vector<float> Distance::getFijs() const
-{
-	return fij;
+	return mijDerivatives.size();
 }
 
 // Set error for one pair mij - sij
 void Distance::setError(float errorsVal)
 {
 	errors.push_back(errorsVal);
+}
+
+// Returns a specific error
+float Distance::getErrors(int idx)
+{
+	// Check if idx is valid
+	checkIdx("Distance::errors", idx, errors.size());
+
+	return errors[idx];
 }
 
 // Returns a vector of errors for a specific parameter derivative
@@ -200,7 +194,6 @@ int Distance::getIntervalNum() const
 // Set vertex derivative of the cuboid2d, in pixel coordinate
 void Distance::setPxlDeriv(Point3f vertexDerivVal, Point3f homogeneousVal)
 {
-	Point2f tmp;
 	Point2f pixelDeriv;
 	if (homogeneousVal.z <= 0.f)
 	{
@@ -211,18 +204,7 @@ void Distance::setPxlDeriv(Point3f vertexDerivVal, Point3f homogeneousVal)
 		homogeneousVal.z = max(homogeneousVal.z, 0.0001f);
 	}
 
-	tmp.x = (vertexDerivVal.x * homogeneousVal.z - homogeneousVal.x * vertexDerivVal.z) / powf(homogeneousVal.z, 2.f);
-	tmp.y = (vertexDerivVal.y * homogeneousVal.z - homogeneousVal.y * vertexDerivVal.z) / powf(homogeneousVal.z, 2.f);
-	pixelDeriv = tmp;
+	pixelDeriv.x = (vertexDerivVal.x * homogeneousVal.z - homogeneousVal.x * vertexDerivVal.z) / powf(homogeneousVal.z, 2.f);
+	pixelDeriv.y = (vertexDerivVal.y * homogeneousVal.z - homogeneousVal.y * vertexDerivVal.z) / powf(homogeneousVal.z, 2.f);
 	pixelDerivatives.push_back(pixelDeriv);
-}
-
-// Check for invalid memory access
-void Distance::checkIdx(int idx, size_t limit)
-{
-	if ((idx >= limit) || (idx < 0))
-	{
-		cout << "ERROR, invalid memory access." << endl;
-		exit(EXIT_FAILURE);
-	}
 }
