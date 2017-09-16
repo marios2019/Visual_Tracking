@@ -51,25 +51,12 @@ int Cuboid2D::getHomogeneousVerticesSize() const
 }
 
 // Set edge to be rendered
-void Cuboid2D::setEdge(vector <Point2f> edgeVal)
+void Cuboid2D::setEdge(vector <Point2f> edgeVal, vector <int> edgeVerticesVal)
 {
-	for (int i = 0; i < edges.size(); i++)
+	if (setEdgePtr(edgeVerticesVal))
 	{
-		if (edges[i] == edgeVal)
-		{
-			return;
-		}
+		edges.push_back(edgeVal);
 	}
-	edges.push_back(edgeVal);
-}
-
-// Change edge[idx] value
-void Cuboid2D::setEdge(vector <Point2f> edge, int idx)
-{
-	// Check if idx is valid
-	checkIdx("Cuboid2D::edges", idx, edges.size());
-
-	edges[idx] = edge;
 }
 
 // Destroy edge[idx]
@@ -86,7 +73,7 @@ void Cuboid2D::destroyEdge(int idx)
 vector <Point2f> Cuboid2D::getEdge(int idx)
 {
 	// Check if idx is valid
-	checkIdx("Cuboid2D::edges", idx, (int) edges.size());
+	checkIdx("Cuboid2D::edges", idx, edges.size());
 	
 	return edges[idx];
 }
@@ -101,6 +88,42 @@ vector <vector <Point2f>> Cuboid2D::getEdges() const
 size_t Cuboid2D::getEdgesSize() const
 {
 	return edges.size();
+}
+
+// Set edgeVertices pointer to verticesPixel
+bool Cuboid2D::setEdgePtr(vector <int> edgePtrVal)
+{
+	// Check if idx is valid
+	checkIdx("Cuboid2D::edgesVertices", edgePtrVal[0], verticesPixel.size());
+	checkIdx("Cuboid2D::edgesVertices", edgePtrVal[1], verticesPixel.size());
+	
+	// Check for duplicates
+	for (int i = 0; i < edgesPtr.size(); i++)
+	{
+		if (edgesPtr[i] == edgePtrVal)
+		{
+			return false;
+		}
+	}
+
+	edgesPtr.push_back(edgePtrVal);
+
+	return true;
+}
+
+// Get edgeVertices[idx]
+vector <int> Cuboid2D::getEdgePtr(int idx)
+{
+	// Check if idx is valid
+	checkIdx("Cuboid2D::edgesVertices", idx, edgesPtr.size());
+
+	return edgesPtr[idx];
+}
+
+// Get all edgeVertices
+vector <vector <int>> Cuboid2D::getEdgesPtr() const
+{
+	return edgesPtr;
 }
 
 // Set surface to be rendered

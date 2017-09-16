@@ -7,64 +7,64 @@ void visualTracker(Cuboid3D &model, Cuboid3D &Data, int width, int height)
 	vector <State> state = { X, Y, Z, THETAX, THETAY, THETAZ };
 	float fov = 60.f;
 	vector <float> defaultParams = { TX, TY, TZ, RX, RY, RZ, MNUM };
-	int iterations = 0; // Number of non linear fitting iterations
+	int iterations = 1, maxIterations = 10; // Number of non linear fitting iterations
 	bool exitFlag = false; // If true, exit application
 	bool updateFlag = true; // If true render again cuboids
 	bool fitFlag = false; // If true start non linear fitting
-	int mNum = MNUM, edgesNum = 0;
+	int mNum = MNUM;
 
 	// Virtual camera initialization
 	Camera virtualCam = createCam(Vec3f(TX, TY, TZ), Vec3f(RX, RY, RZ), fov, width, height, state);
 	// Real camera initialization	
-	Camera realCam = createCam(Vec3f(TX+2, TY, TZ), Vec3f(RX, RY, RZ), fov, width, height, state);
+	Camera realCam = createCam(Vec3f(TX + 2, TY, TZ), Vec3f(RX, RY, RZ), fov, width, height, state);
 
 	// Image plane WIDTHxHEIGHT pixels
 	Mat imagePlane(height, width, CV_8UC3, CV_RGB(255, 255, 255));
 	Mat imagePlaneModel(height, width, CV_8UC3, CV_RGB(255, 255, 255));
 	Mat imagePlaneData(height, width, CV_8UC3, CV_RGB(255, 255, 255));
-	DistClosedForm distCF;
-	
+	Mat dataImage(height, width, CV_8UC3, CV_RGB(255, 255, 255));
+	// Distances first partial derivatives
+	Mat Jdijs, dijs;
+
 	while (!exitFlag)
 	{
 		if (updateFlag)
 		{
-			vector <Distance> distances;
-			for (int i = 0; i < virtualCam.getStateSize(); i++)
-			{
-				distances.push_back(Distance());
-			}
 			//Update frame
-			Cuboid2D modelProjection = updateFrame(virtualCam, realCam, model, Data, distCF, imagePlane, imagePlaneModel, imagePlaneData, distances);
-			edgesNum = static_cast<int>(modelProjection.getEdgesSize());
-			//// Disimillarity between data and model object
-			//dissimilarity(modelProjection, imagePlane, imagePlaneData, distances, distCF, mNum);
-			//// Errors vector
-			//vector <float> errors;
-			//errors = distances[0].getErrors();
-			//if (!errors.empty())
-			//{
-			//	Mat E = Mat(static_cast<int>(errors.size()), 1, CV_32F);
-			//	memcpy(E.data, errors.data(), errors.size() * sizeof(float));
-			//	cout << "Dissimilarity between model and data object: " << sum(E)[0] << endl;
-			//}
+			Cuboid2D modelProjection = updateFrame(virtualCam, realCam, model, Data, imagePlane, imagePlaneModel, imagePlaneData, dataImage);
+			// Disimillarity between data and model object
+			Mat distTransform, mijs;
+			dissimilarity(modelProjection, imagePlane, dataImage, mNum, mijs, dijs, distTransform);
+			cout << "Error: " << dijs.t() * dijs << endl;
+
+			// Display Model - Data dissimilarity
+			dispImagePlane("Model - Data image plane", imagePlane);
+			// Display distance transform image
+			dispImagePlane("Distance Transform of data image", normalise(distTransform));
+
+			// Compute first derivatives of 3D homogeneous projection model coordinates
+			// in respect to the state parameters of the camera - extrinsics parameters
+			Jdijs = computeModelFirstDerivatives(model, modelProjection, virtualCam, mijs, distTransform);
 		}
 		if (fitFlag)
 		{
 			// Calculate new extrinsics matrix with smaller error according to data
-			/*fitting(virtualCam, distCF, edgesNum);
-			++iterations;
-			if (iterations == 1)
+			if (iterations == maxIterations)
 			{
 				fitFlag = false;
-				iterations = 0;
-			}*/
+				iterations = 1;
+			}
+			
+			vector <float> xNew = fittingGaussNewton(virtualCam.getParams(virtualCam.getStates()), virtualCam.getStates(), Jdijs, dijs);
+			virtualCam.setParams(xNew, virtualCam.getStates(), DEGREES);
+			++iterations;
 		}
 		else
 		{
 			// Keys pressed handler
 			keyboardHandler(virtualCam, realCam, model, Data, mNum, defaultParams, exitFlag, updateFlag, fitFlag);
-			// Clear distCF
-			distCF.Reset();
+			Jdijs.release();
+			dijs.release();
 		}
 	}
 }
@@ -114,120 +114,16 @@ void modelData(float &length, float &height, float &width)
 	}
 }
 
-// Render function - data
+// Render function
 Cuboid2D rendering(Cuboid3D &cuboid3D, Camera camera, Mat &imagePlane, Mat &imagePlaneObj, string type)
-{
-	// Initialization
-	Mat tmp(imagePlane.rows, imagePlane.cols, CV_8UC3, CV_RGB(255, 255, 255));
-	tmp.copyTo(imagePlaneObj);
-	vector <int>::iterator iter1, iter2;
-	vector <int> edge, checkEdge;
-	vector <Point3f> homogeneousVertices;
-	vector <int> surface;
-	vector <Point2f> pointsPxl;
-	for (int i = 0; i < cuboid3D.getEdgesSize(); i++)
-	{
-		cuboid3D.setEdgeVisibility(i, false);
-	}
-	for (int i = 0; i < cuboid3D.getSurfacesSize(); i++)
-	{
-		cuboid3D.setSurfaceVisibility(i, false);
-	}
-
-	// Perspective projection matrix
-	Mat P = camera.getIntrinsics() * camera.getExtrinsics();
-
-	// Project vertices to image plane
-	vector <float> homogeneous;
-	for (int i = 0; i < cuboid3D.getVerticesSize(); i++)
-	{
-		// Convert vertex coordinates to homogeneous coordinates
-		homogeneous.push_back(cuboid3D.getVertex(i).x);
-		homogeneous.push_back(cuboid3D.getVertex(i).y);
-		homogeneous.push_back(cuboid3D.getVertex(i).z);
-		homogeneous.push_back(1.f);
-
-		// Perspective projection
-		Mat tmp = P * Mat(homogeneous, false);
-		Point3f projection(tmp);
-		homogeneousVertices.push_back(projection);
-		homogeneous.clear();
-	}
-
-	// Create cuboid2d - projection of cuboid3d
-	Cuboid2D objProjection(homogeneousVertices);
-	homogeneousVertices.clear();
-	
-	// Surface occlusion
-	for (int i = 0; i < cuboid3D.getSurfacesSize(); i++)
-	{
-		// Check if surface is not occluded
-		if (!backFaceCulling(cuboid3D.getSurfaceVertices(i), cuboid3D.getVertices(), camera.getPosition()))
-		{
-			// Surface i is visible
-			cuboid3D.setSurfaceVisibility(i, true);
-			surface = cuboid3D.getSurfaceVertices(i);
-			if (cuboid3D.getSurfaceVisibility(i))
-			{
-				objProjection.setSurface(surface);
-			}
-			for (int j = 0; j < surface.size(); j++)
-			{
-				// Egde j is visible
-				edge.push_back(surface[j]);
-				edge.push_back(surface[(j + 1) % surface.size()]);
-				for (int k = 0; k < cuboid3D.getEdgesSize(); k++)
-				{
-					if (!(cuboid3D.getEdgeVisibility(k)))
-					{
-						checkEdge = cuboid3D.getEdge(k);
-						iter1 = find(checkEdge.begin(), checkEdge.end(), edge[0]);
-						iter2 = find(checkEdge.begin(), checkEdge.end(), edge[1]);
-						if ((iter1 != checkEdge.end()) && (iter2 != checkEdge.end()))
-						{
-							cuboid3D.setEdgeVisibility(k, true);
-							pointsPxl.push_back(objProjection.getVertexPxl(edge[0]));
-							pointsPxl.push_back(objProjection.getVertexPxl(edge[1]));
-							if (cuboid3D.getEdgeVisibility(k) && edgeClip(pointsPxl, imagePlane.size()))
-							{
-								objProjection.setEdge(pointsPxl);
-								checkEdge.clear();
-								pointsPxl.clear();
-								break;
-							}
-						}
-						checkEdge.clear();
-					}
-				}
-				edge.clear();
-			}
-			surface.clear();
-		}
-	}
-
-	// Render object
-	drawObj(objProjection, imagePlane, imagePlaneObj, type);
-
-	// Display image plane object
-	string windowName = "Image Plane";
-	namedWindow(windowName, WINDOW_AUTOSIZE);
-	imshow(windowName, imagePlane);
-
-	// Display image plane object
-	windowName = "Cuboid3D " + type;
-	namedWindow(windowName, WINDOW_AUTOSIZE);
-	imshow(windowName, imagePlaneObj);
-	
-	return objProjection;
-}
-
-// Render function - model
-Cuboid2D rendering(Cuboid3D &cuboid3D, Camera camera, Mat &imagePlane, Mat &imagePlaneObj, vector <Distance> &distances, string type)
 {
 	// Initialization
 	Mat img(imagePlane.rows, imagePlane.cols, CV_8UC3, CV_RGB(255, 255, 255));
 	img.copyTo(imagePlaneObj);
-	img.copyTo(imagePlane);
+	if (!(type.compare("model")))
+	{
+		img.copyTo(imagePlane);
+	}
 	vector <Point3f> homogeneousVertices;
 
 	// Reset visibility
@@ -240,336 +136,70 @@ Cuboid2D rendering(Cuboid3D &cuboid3D, Camera camera, Mat &imagePlane, Mat &imag
 	for (int i = 0; i < cuboid3D.getVerticesSize(); i++)
 	{
 		homogeneousVertices.push_back(perspectiveProjection(cuboid3D.getVertex(i), P));
-		// Perspective projection derivative
-		for (int j = 0; j < camera.getStateSize(); j++)
-		{
-			// Perspective projection derivative matrix
-			Mat dP = camera.getLieAlgebraDerivative(j);
-			Mat tmpDeriv = dP * Mat(cart2hmgns(cuboid3D.getVertex(i)), false);
-			Point3f homogeneousDeriv(tmpDeriv);
-			distances[j].setVertexDeriv(homogeneousDeriv, homogeneousVertices[i]);
-		}
 	}
 
 	// Create cuboid2d - projection of cuboid3d
 	Cuboid2D objProjection(homogeneousVertices);
 	
 	// Object visibility culling
-	visibilityCulling(cuboid3D, objProjection, distances, camera, imagePlane.size());
+	visibilityCulling(cuboid3D, objProjection, camera, imagePlane.size());
 
 	// Render object
-	drawObj(objProjection, imagePlane, imagePlaneObj, type);
-
-	// Display image plane object
-	dispImagePlane("Image Plane", imagePlane);
-
-	// Display image plane object
-	dispImagePlane("Cuboid3D " + type, imagePlaneObj);
-
-	return objProjection;
-}
-
-// Dissimilarity between data and model object
-void dissimilarity(Cuboid2D &model, Mat &imagePlane, Mat imagePlaneData, vector <Distance> &distances, DistClosedForm &distCF, int mNum)
-{
-	// Initialization
-	float offsetOut, offsetIn, normVec, normNormalVec;
-	Vec2f vec, normalOut, normalIn, checkNormal;
-	Point2f  vi, vj, p, tmp, pC, p_mi, pNormal, pCheck;
-	vector <Point2f> normalLine, edge;
-	Vec3b pixel;
-	Rect rectangle(0, 0, imagePlane.cols, imagePlane.rows);
-	int length;
-
-	// Set mijNum = mNum - 2
-	for (int i = 0; i < distances.size(); i++)
-	{
-		distances[i].setIntervalNum(mNum - 2);
-	}
-
-	for (int i = 0; i < model.getEdgesSize(); i++)
-	{
-		// Check if edge is visible
-		edge = model.getEdge(i);
-		// Compute equal distance points on each edge
-		vi = edge[0];
-		vj = edge[1];
-		vec = vj - vi;
-		normVec = norm2(vec);
-
-		if (normVec > 0.f)
-		{
-			// In and Out normal for each edge
-			normalOut.val[0] = -(vj.y - vi.y);
-			normalOut.val[1] = vj.x - vi.x;
-			normalOut = normalOut / max(norm2(normalOut), 0.0001f);
-			normalIn.val[0] = -(vi.y - vj.y);
-			normalIn.val[1] = vi.x - vj.x;
-			normalIn = normalIn / max(norm2(normalIn), 0.0001f);
-
-			// For each mi on vivj edge compute normal vector and distance from data object
-			for (int j = 1; j < (mNum - 1); j++)
-			{
-				offsetOut = 10.f;
-				offsetIn = 10.f;
-				// Calculate mi on edge vivj
-				p = vec * ((float)j / (float)(mNum - 1));
-				p = vi + p;
-				p_mi = p;
-
-				// Draw Out normal from current mi
-				tmp.x = p_mi.x + offsetOut * normalOut.val[0];
-				tmp.y = p_mi.y + offsetOut * normalOut.val[1];
-				pNormal = tmp;
-				// Edge near image plane
-				if (!(pNormal.inside(rectangle)))
-				{
-					checkNormal = (Point2f)(pNormal - p_mi);
-					normNormalVec = norm2(checkNormal);
-					length = (int)normNormalVec;
-					if (length > 0)
-					{
-						checkNormal = checkNormal / normNormalVec;
-						// Check if the whole egde is outside the image plane
-						for (int k = 0; k <= length; k++)
-						{
-							pC = checkNormal * ((float)k / (float)(length)) * normNormalVec;
-							pC = (Point2f)p_mi + pC;
-							pCheck = pC;
-							if (pCheck.inside(rectangle))
-							{
-								pNormal = pCheck;
-								offsetOut = (float)k;
-								break;
-							}
-						}
-					}
-					else
-					{
-						pNormal = p_mi;
-					}
-				}
-				normalLine.push_back(pNormal);
-				arrowedLine(imagePlane, p_mi, pNormal, CV_RGB(0, 0, 0), 1, CV_AA, 0, 0.5);
-
-				// Draw In normal from current mi
-				tmp.x = p_mi.x + offsetIn * normalIn.val[0];
-				tmp.y = p_mi.y + offsetIn * normalIn.val[1];
-				pNormal = tmp;
-				// Edge near image plane
-				if (!(pNormal.inside(rectangle)))
-				{
-					checkNormal = (Point2f)(pNormal - p_mi);
-					normNormalVec = norm2(checkNormal);
-					length = (int)normNormalVec;
-					if (length > 0)
-					{
-						checkNormal = checkNormal / normNormalVec;
-						// Check if the whole egde is outside the image plane
-						for (int k = 0; k <= length; k++)
-						{
-							pC = checkNormal * ((float)k / (float)(length)) * normNormalVec;
-							pC = (Point2f)p_mi + pC;
-							pCheck = pC;
-							if (pCheck.inside(rectangle))
-							{
-								pNormal = pCheck;
-								offsetIn = (float)k;
-								break;
-							}
-						}
-					}
-					else
-					{
-						pNormal = p_mi;
-					}
-				}
-				normalLine.push_back(pNormal);
-				arrowedLine(imagePlane, p_mi, pNormal, CV_RGB(0, 0, 0), 1, CV_AA, 0, 0.5);
-				circle(imagePlane, p_mi, 2, CV_RGB(0, 0, 0), -1, 8, 0);
-
-				// Calculate distanse
-				calcDist(distances, distCF, normalOut, vec, normalLine, pNormal, p_mi, offsetOut, offsetIn, imagePlane, imagePlaneData, i, j);
-
-				normalLine.clear();
-			}
-		}
-		edge.clear();
-	}
-
-	// Display Model - Data dissimilarity
-	dispImagePlane("Model - Data dissimilarity", imagePlane);
-}
-
-// Calculate distance between model and data
-void calcDist(vector <Distance> &distances, DistClosedForm &distCF, Vec2f normalOut, Vec2f vec, vector <Point2f> normalLine,
-	Point2f pNormal, Point2f p_mi, float offsetOut, float offsetIn, Mat &imagePlane, Mat imagePlaneData, int idx, int j)
-{
-	Point2f intersection, pN;
-	float normalOffset, maxValue = 765.f;
-	Vec2f normalVec;
-	Vec3b pixel;
-	int mNum = distances[0].getIntervalNum() + 2;
-
-	// Calculate edge distance between model and data object
-	normalOffset = offsetOut + offsetIn;
-	normalVec = normalLine[1] - normalLine[0];
-	vector <float> weights;
-	float pixelValue;
-	vector <Point2f> sijPoints;
-	int pointer = 0, continuous = 0;
-	bool first = false;
-	for (int k = 0; k <= normalOffset; k++)
-	{
-		pN = normalVec * ((float)k / (float)(normalOffset));
-		pN = normalLine[0] + pN;
-		pNormal = pN;
-		// Find the pixel with the smallest value
-		pixel = imagePlaneData.at<Vec3b>(pNormal);
-		pixelValue = (float)(pixel.val[0] + pixel.val[1] + pixel.val[2]);
-		if (pixelValue < maxValue)
-		{
-			// First interpolation
-			if (!first)
-			{
-				first = true;
-			}
-			pointer = k;
-			if (pointer == continuous + 1)
-			{
-				weights.push_back(pixelValue / 765.f);
-				sijPoints.push_back(pNormal);
-				continuous = k;
-			}
-		}
-		else
-		{
-			if (!first)
-			{
-				continuous = k;
-			}
-		}
-	}
-	// Calculate euclidean distance between model and data edge
-	if (sijPoints.size() > 0)
-	{
-		// Intersection is found
-		// Find exact sij point on the data edge - weighted average
-		float weightsSum = 0.f;
-		for (int k = 0; k < sijPoints.size(); k++)
-		{
-			intersection += (1 - weights[k]) * sijPoints[k];
-			weightsSum += (1 - weights[k]);
-		}
-		intersection.x = intersection.x / weightsSum;
-		intersection.y = intersection.y / weightsSum;
-		circle(imagePlane, intersection, 2, CV_RGB(255, 0, 0), -1, CV_AA, 0);
-		// Assign mij, calculate mij derivatives, assign dij and calculate dij derivatives
-		for (int s = 0; s < (int)distances.size(); s++)
-		{
-			distances[s].setInterval(p_mi);
-			Point2f dp_mi, dsij = Point2f(0.f, 0.f);
-			Vec2f dvec, dij, lij;
-			dvec = distances[s].getEdgeDeriv(idx)[1] - distances[s].getEdgeDeriv(idx)[0];
-			dp_mi = ((float)j / (float)(mNum - 1)) * dvec;
-			dp_mi += distances[s].getEdgeDeriv(idx)[0];
-			distances[s].setIntervalDeriv(dp_mi);
-			dij = (Point2f)(intersection - p_mi);
-			distances[s].setError(norm2(dij));
-			lij = dp_mi;
-			if (s == 0)
-			{
-				distCF.setDij(norm2(dij));
-			}
-			distCF.setFij(lij.dot(normalVec / norm2(normalVec)));
-		}
-	}
-	else
-	{
-		// Assign mij, calculate mij derivatives, assign dij and calculate dij derivatives
-		// Intersection not found
-		for (int s = 0; s < distances.size(); s++)
-		{
-			distances[s].setInterval(p_mi);
-			float lambda = offsetOut;
-			Point2f dp_mi;
-			Vec2f dvec, dij, normal, lij;
-			normal = normalOut;
-			dvec = distances[s].getEdgeDeriv(idx)[1] - distances[s].getEdgeDeriv(idx)[0];
-			dp_mi = ((float)j / (float)(mNum - 1)) * dvec;
-			dp_mi += distances[s].getEdgeDeriv(idx)[0];
-			distances[s].setIntervalDeriv(dp_mi);
-			dij.val[0] = p_mi.x + lambda * normal.val[0];
-			dij.val[1] = p_mi.y + lambda * normal.val[1];
-			distances[s].setError(norm2(dij));
-			lij = dp_mi;
-			if (s == 0)
-			{
-				distCF.setDij(norm2(dij));
-			}
-			distCF.setFij(lij.dot(normalVec / norm2(normalVec)));
-		}
-	}
-}
-
-// Calculate new extrinsics matrix closer to the data
-void fitting(Camera& virtualCam, DistClosedForm& distCF, int edgesNum)
-{
-	distCF.setWnum(virtualCam.getStateSize());
-	distCF.calcFijWeights(edgesNum, MNUM - 2);
-	Mat M = expMap(distCF);
-	Mat R;
-	Vec3f t;
-	decomposeEuclidean(M, R, t);
-	cout << matrix2euler(R) * 180.f / PI << endl;
-	Mat dcamPose;
-	cameraPose(R, Mat(t), dcamPose);
-	cout << dcamPose << endl;
-
-	Mat E = virtualCam.getExtrinsics() * dcamPose;
-	virtualCam.setExtrinsics(E);
-}
-
-// Exponential map se(3) to SE(3)
-Mat expMap(DistClosedForm &distCF)
-{
-	Mat I, R, V;
-	Mat M = Mat::zeros(4, 4, CV_32F);
-	vector <float> params = distCF.getWs();
-	Vec3f u = Vec3f(params[0], params[1], params[2]);
-	Vec3f w = Vec3f(params[3], params[4], params[5]);
-	I = Mat::eye(3, 3, CV_32F);
-	float theta = max(sqrtf(w.dot(w)), 0.0001f);
-	float a = sin(theta) / theta;
-	float thetaSQR = theta * theta;
-	float b = (1 - cos(theta)) / thetaSQR;
-	float c = (1 - a) / thetaSQR;
-
-	Mat Wx = skewMat(w);
-
-	R = I + a * Wx + b * (Wx * Wx);
-	V = I + b * Wx + c * (Wx * Wx);
-
-	Rect r(0, 0, 3, 3);
-	R.copyTo(M(r));
-	Mat Vu = V * Mat(u);
-	M.at<float>(0, 3) = Vu.at<float>(0);
-	M.at<float>(1, 3) = Vu.at<float>(1);
-	M.at<float>(2, 3) = Vu.at<float>(2);
-	M.at<float>(3, 3) = 1.f;
-
-	return M;
-}
-
-// Draw object on image planes
-void drawObj(Cuboid2D objProjection, Mat &imagePlane, Mat &imagePlaneObj, string type)
-{
 	Vec3b colour = Vec3b(0, 0, 0);
 	if (!(type.compare("data")))
 	{
 		colour.val[2] = 255;
 	}
+	drawObj(objProjection, imagePlane, imagePlaneObj, colour, CV_AA);
+
+#ifdef IMSHOW
+	// Display image plane object
+	dispImagePlane("Image Plane", imagePlane);
+
+	// Display image plane object
+	dispImagePlane("Cuboid3D " + type, imagePlaneObj);
+#endif
+
+	return objProjection;
+}
+
+// Dissimilarity between data and model object
+void dissimilarity(Cuboid2D model, Mat &imagePlane, Mat dataImage, int mNum, Mat &mijs, Mat &dijs, Mat &distTransform)
+{
+	// Initialization
+	vector <vector <Point2f>> edgesVertices = model.getEdges();
+	float offset = 10.f;
+
+	// Construct edges vectors
+	Mat edgesVec = edgesVectors(edgesVertices);
+
+	// Calculate edges normals vectors
+	Mat edgesNormals = edgesNormalVectors(edgesVec);
+
+	// Calculate edges subintervals
+	mijs = edgesSubIntervals(edgesVec, edgesVertices, mNum);
+
+	// Calculate normal lines for each mij, according to the edge normal
+	Mat mijNormalLines = subIntervalsNormals(mijs, edgesNormals, offset, imagePlane.size());
+
+	// Draw mijs
+	drawMijs(mijs, mijNormalLines, imagePlane);
+
+	// Calculate distance transform
+	distTransform = computeDistanceTransform(dataImage);
 	
+	// Calculate dijs
+	dijs = calculateDistance(mijs, distTransform);
+}
+
+// Draw object on image planes
+void drawObj(Cuboid2D objProjection, Mat &imagePlane, Mat &imagePlaneObj, Vec3b colour, int lineType)
+{
+	if (imagePlane.size() != imagePlaneObj.size())
+	{
+		errorSize("imagePlane", "imagePlaneObj", imagePlane.size(), imagePlaneObj.size(), __FILE__, __LINE__ - 4);
+	}
+
 	for (int i = 0; i < objProjection.getEdgesSize(); i++)
 	{
 		Point2i p1(objProjection.getEdge(i)[0]);
@@ -580,13 +210,13 @@ void drawObj(Cuboid2D objProjection, Mat &imagePlane, Mat &imagePlaneObj, string
 		imagePlaneObj.at<Vec3b>(p1.y, p1.x) = colour;
 		imagePlaneObj.at<Vec3b>(p2.y, p2.x) = colour;
 		// Draw edges
-		line(imagePlane, p1, p2, colour, 1.5, CV_AA, 0);
-		line(imagePlaneObj, p1, p2, colour, 1, CV_AA, 0);
+		line(imagePlane, p1, p2, colour, 1, lineType, 0);
+		line(imagePlaneObj, p1, p2, colour, 1, lineType, 0);
 	}
 }
 
 // Check which parts of the object are visible from the camera's given viewpoint
-void visibilityCulling(Cuboid3D &cuboid3D, Cuboid2D &cuboid2D, vector <Distance> &distances, Camera camera, Size size)
+void visibilityCulling(Cuboid3D &cuboid3D, Cuboid2D &cuboid2D, Camera camera, Size size)
 {
 	int edge;
 	vector <int> surfaceVertices, surfaceEdges, edgeVertices;
@@ -610,18 +240,10 @@ void visibilityCulling(Cuboid3D &cuboid3D, Cuboid2D &cuboid2D, vector <Distance>
 				edgeVertices = cuboid3D.getEdge(edge);
 				pointsPxl.push_back(cuboid2D.getVertexPxl(edgeVertices[0]));
 				pointsPxl.push_back(cuboid2D.getVertexPxl(edgeVertices[1]));
-				// If rendered == true
+				// If rendered == true and current edge belongs to the image plane
 				if (cuboid3D.getEdgeVisibility(edge) && edgeClip(pointsPxl, size)) 
 				{
-					cuboid2D.setEdge(pointsPxl);
-					// Edges derivatives
-					for (int s = 0; s < distances.size(); s++)
-					{
-						vector <Point2f> edgeDerivative;
-						edgeDerivative.push_back(distances[s].getPxlDeriv(edgeVertices[0]));
-						edgeDerivative.push_back(distances[s].getPxlDeriv(edgeVertices[1]));
-						distances[s].setEdgeDeriv(edgeDerivative);
-					}
+					cuboid2D.setEdge(pointsPxl, edgeVertices);
 				}
 				pointsPxl.clear();
 				edgeVertices.clear();
@@ -697,12 +319,17 @@ int backFaceCulling(vector <int> surface, vector <Point3f> vertices, Point3f t)
 }
 
 // Fixed time frame update
-Cuboid2D updateFrame(Camera &virtualCam, Camera &realCam, Cuboid3D &model, Cuboid3D &Data, DistClosedForm &distCF, Mat &imagePlane, Mat &imagePlaneModel, Mat &imagePlaneData, vector <Distance> &distances)
+Cuboid2D updateFrame(Camera &virtualCam, Camera &realCam, Cuboid3D &model, Cuboid3D &Data, Mat &imagePlane, Mat &imagePlaneModel, Mat &imagePlaneData, Mat &dataImg)
 {
 	// Render model
-	Cuboid2D modelProjection = rendering(model, virtualCam, imagePlane, imagePlaneModel, distances, "model");
+	Cuboid2D modelProjection = rendering(model, virtualCam, imagePlane, imagePlaneModel, "model");
+
 	// Render data
 	Cuboid2D dataProjection = rendering(Data, realCam, imagePlane, imagePlaneData, "data");
+
+	// Draw aliassed image
+	dataImg = Mat(dataImg.size(), dataImg.type(), CV_RGB(255, 255, 255));
+	drawObj(dataProjection, dataImg, dataImg, Vec3b(0, 0, 0), 8);
 
 	// Display camera parameters
 	dispCamParams(virtualCam, realCam);
@@ -735,4 +362,308 @@ void dispImagePlane(string windowName, Mat imagePlane)
 	namedWindow(windowName, WINDOW_AUTOSIZE);
 	imshow(windowName, imagePlane);
 	// waitKey(1);
+}
+
+// Convert 3D vertices and parameters values to Mat, states to enum Parameters and extract intrisincs matrix
+void extractDataForDerivatives(Cuboid3D model, Cuboid2D modelProjection, Camera virtualCam, Mat &V, Mat &Vph, Mat &K, Mat &x, vector <Parameter> &xk)
+{
+	// Cuboi3D vertices in 3D cartesian coordinates
+	V = convertSTLvector2Mat(model.getVertices(), model.getVerticesSize(), 3, CV_32F);
+	// Cuboid2D vertices in 3D homogeneous projection coordinates
+	Vph = convertSTLvector2Mat(modelProjection.getHomogeneousVertices(), static_cast<int>(modelProjection.getHomogeneousVertices().size()), 3, CV_32F);
+	// Virtual camera intrinscs matrix
+	K = virtualCam.getIntrinsics();
+	// Virtual camera state parameters values
+	x = convertSTLvector2Mat(virtualCam.getParams(), static_cast<int>(virtualCam.getParams().size()), 1, CV_32F);
+	// Virtual camera state parameters
+	for (int i = 0; i < virtualCam.getStateSize(); i++)
+	{
+		xk.push_back(static_cast<Parameter>(virtualCam.getState(i)));
+	}
+}
+
+// Convert STL vector to OpenCV Mat
+template <typename T>
+Mat convertSTLvector2Mat(vector <T> vec, int rows, int cols, int type)
+{
+	int size = rows;
+	Mat M = Mat(rows, cols, type);
+	memcpy(M.data, vec.data(), size * sizeof(T));
+
+	return M;
+}
+
+// Calculate edges vectors
+Mat edgesVectors(vector <vector <Point2f>> edges)
+{
+	Mat edgesVec(static_cast<int>(edges.size()), 1, CV_32FC2);
+
+	// Calculate each edge vector
+	for (int i = 0; i < edgesVec.rows; i++)
+	{
+		vector <Point2f> edge = { edges[i] };
+		edgesVec.at<Vec2f>(i, 0) = edge[1] - edge[0];
+	}
+
+	return edgesVec;
+}
+
+// Calculate edges direction vectors
+Mat edgesDirectionVectors(vector <vector <Point2f>> edges)
+{
+	Mat edgesDirection(static_cast<int>(edges.size()), 1, CV_32FC2);
+
+	// Calculate each edge vector
+	for (int i = 0; i < edgesDirection.rows; i++)
+	{
+		vector <Point2f> edge = { edges[i] };
+		edgesDirection.at<Vec2f>(i, 0) = (edge[1] - edge[0]) / norm2(edge[1] - edge[0]);
+	}
+
+	return edgesDirection;
+}
+
+// Calculate edges normal unit vectors
+Mat edgesNormalVectors(Mat edgesVec)
+{
+	Mat edgesNormals(edgesVec.rows, 1, CV_32FC2);
+
+	// Calculate normal vector for each edge
+	for (int i = 0; i < edgesNormals.rows; i++)
+	{
+		Vec2f edgeVec = edgesVec.at<Vec2f>(i, 0);
+		Vec2f edgeNormal(-edgeVec.val[1], edgeVec.val[0]);
+		edgesNormals.at<Vec2f>(i, 0) = edgeNormal / norm2(edgeNormal);
+	}
+
+	return edgesNormals;
+}
+
+// Calculate the subintervals mijs for all edges
+Mat edgesSubIntervals(Mat edgesVec, vector <vector <Point2f>> edgesVertices, int mNum)
+{
+	Mat mijs(mNum - 2, edgesVec.rows, CV_32FC2);
+	int first = 1, last = mNum - 1;
+	
+	if (edgesVec.rows != static_cast<int>(edgesVertices.size()))
+	{
+		errorSize("edgesVector", "edgesVertices", edgesVec.rows, static_cast<int>(edgesVertices.size()), __FILE__, __LINE__ - 7);
+	}
+
+	for (int i = 0; i < mijs.cols; i++)
+	{
+		Vec2f edgeVec = edgesVec.at<Vec2f>(i, 0);
+		vector <Point2f> edgeVertices = { edgesVertices[i] };
+		for (int j = first; j < last; j++)
+		{
+			mijs.at<Vec2f>(j - 1, i) = static_cast<Vec2f>(edgeVertices[0]) + static_cast<float>(j) * edgeVec / static_cast<float>(mNum - 1);
+		}
+	}
+
+	return mijs;
+}
+
+// Calculate for normal vectors for all mijs
+Mat subIntervalsNormals(Mat mijs, Mat edgesNormals, float offset, Size size)
+{
+	Mat mijsNormals(mijs.size(), CV_32FC4);
+
+	if (mijs.cols != edgesNormals.rows)
+	{
+		errorSize("mijs", "edgesNormals", mijs.cols, edgesNormals.rows, __FILE__, __LINE__ - 6);
+	}
+
+	for (int i = 0; i < mijsNormals.rows; i++)
+	{
+		for (int j = 0; j < mijsNormals.cols; j++)
+		{
+			vector <Point2f> normalLine;
+			normalLine.push_back(mijs.at<Point2f>(i, j) + offset * edgesNormals.at<Point2f>(j, 0));
+			normalLine.push_back(mijs.at<Point2f>(i, j) - offset * edgesNormals.at<Point2f>(j, 0));
+			edgeClip(normalLine, size);
+			mijsNormals.at<Vec4f>(i, j) = Vec4f(normalLine[0].x, normalLine[0].y, normalLine[1].x, normalLine[1].y);
+		}
+	}
+
+	return mijsNormals;
+}
+
+// Draw mijs and mijs normal lines on each edge of the model
+void drawMijs(Mat mijs, Mat mijsNormalLines, Mat &imagePlane)
+{
+	Vec3b colour = Vec3b(0, 0, 0);
+
+	if (mijs.size() != mijsNormalLines.size())
+	{
+		errorSize("mijs", "mijsNormalLines", mijs.size(), mijsNormalLines.size(), __FILE__, __LINE__ - 8);
+	}
+
+	for (int j = 0; j < mijs.cols; j++)
+	{
+		for (int i = 0; i < mijs.rows; i++)
+		{
+			circle(imagePlane, mijs.at<Point2f>(i, j), 2, colour, -1, 8);
+			Vec4f normalLine = mijsNormalLines.at<Vec4f>(i, j);
+			line(imagePlane, Point2f(normalLine.val[0], normalLine.val[1]), Point2f(normalLine.val[2], normalLine.val[3]), colour, 1, CV_AA);
+		}
+	}
+}
+
+// Compute the distance transform for the data object
+Mat computeDistanceTransform(Mat dataImage)
+{
+	// Create binary data image
+	Mat binaryImage;
+	cvtColor(dataImage, binaryImage, CV_BGR2GRAY);
+	
+	// Calculate distance trasnform
+	Mat distTransform;
+	distanceTransform(binaryImage, distTransform, CV_DIST_L2, 3);
+	
+	return distTransform;
+}
+
+// Convert to display distance transform
+Mat normalise(Mat Img)
+{
+	Mat normaliseImg(Img.size(), CV_32FC1);
+	double min, max;
+	float offset = 0.f;
+	minMaxLoc(Img, &min, &max);
+	if (min < 0.0)
+	{
+		offset = static_cast<float>(-min);
+		max += -min;
+	}
+	normaliseImg = (Img + offset) / max;
+		
+	return normaliseImg;
+}
+
+// Calculate distance from each mij to data
+Mat calculateDistance(Mat mijs, Mat distTransform)
+{
+	Mat dijs(mijs.rows * mijs.cols, 1, CV_32FC1);
+	int x, y;
+
+	for (int j = 0; j < mijs.cols; j++)
+	{
+		for (int i = 0; i < mijs.rows; i++)
+		{
+			x = static_cast<int>(round(mijs.at<Point2f>(i, j).y));
+			y = static_cast<int>(round(mijs.at<Point2f>(i, j).x));
+			dijs.at<float>((j * mijs.rows) + i, 0) = distTransform.at<float>(x, y);
+		}
+	}
+
+	return dijs;
+}
+
+// Find the interpolated intersection with the data edge
+Mat findIntersection(Vec4f mijNormalLine, Mat imagePlaneData, vector <float> &weights)
+{
+	Point2f p1(mijNormalLine.val[0], mijNormalLine.val[1]), p2(mijNormalLine.val[1], mijNormalLine.val[2]);
+	Vec2f mijNormalVector(p2 - p1);
+	int mijNormalLength = static_cast<int>(norm2(mijNormalVector));
+	float maxValue = 765.f;
+	vector <Point2f> sijPoints;
+	int pointer = 0, continuous = 0;
+	bool first = false;
+	
+	for (int i = 0; i <= mijNormalLength; i++)
+	{
+		// Find the pixel with the smallest value
+		Point2f pmijNormal = p1 + static_cast<Point2f>(mijNormalVector) * (static_cast<float>(i) / mijNormalLength);
+		Vec3b pixel = imagePlaneData.at<Vec3b>(pmijNormal);
+		float pixelValue = static_cast<float>(pixel.val[0] + pixel.val[1] + pixel.val[2]);
+		if (pixelValue < maxValue)
+		{
+			// First interpolation
+			if (!first)
+			{
+				first = true;
+			}
+			pointer = i;
+			if (pointer == continuous + 1)
+			{
+				weights.push_back(pixelValue / 765.f);
+				sijPoints.push_back(pmijNormal);
+				continuous = i;
+			}
+		}
+		else
+		{
+			if (!first)
+			{
+				continuous = i;
+			}
+		}
+	}
+
+	return convertSTLvector2Mat(sijPoints, static_cast<int>(sijPoints.size()), 1, CV_32FC2);
+}
+
+// Compute distance transform gradient
+void distTransformImageGradient(Mat distTransform, Mat &dxdist, Mat &dydist)
+{
+	dxdist = imageGradient(distTransform, Dx);
+
+	dydist = imageGradient(distTransform, Dy);
+}
+
+// Compute dijs first derivatives
+Mat computeModelFirstDerivatives(Cuboid3D model, Cuboid2D modelProjection, Camera virtualCam, Mat mijs, Mat distTransform)
+{
+	Mat V, Vph, K, x;
+	vector <Parameter> xk;
+	extractDataForDerivatives(model, modelProjection, virtualCam, V, Vph, K, x, xk);
+	Mat Jvph = jacobianPerspectiveProjection(V, K, x, xk);
+	// Compute first derivatives of 2D projection model pixel coordinates
+	Mat Jvp = jacobianPixelCoordinates(Vph, Jvph);
+	// Compute first derivatives of 2D projection model edges
+	Mat Jep = jacobianEdges(Jvp, modelProjection.getEdgesPtr());
+	// Compute first derivatives of mijs
+	Mat Jmijs = jacobianMijs(Jep, mijs.rows + 2);
+	// Compute image gradient dx, dy
+	Mat dxDist, dyDist;
+	distTransformImageGradient(distTransform, dxDist, dyDist);
+	dispImagePlane("Dx of Distance Transform", normalise(dxDist));
+	dispImagePlane("Dy of Distance Trasnform", normalise(dyDist));
+	// Compute first derivatives of distances dijs
+	Mat Jdijs = jacobianDijs(mijs, Jmijs, dxDist, dyDist);
+
+	return Jdijs;
+}
+
+// Gauss - Newton non linear fitting
+vector <float> fittingGaussNewton(vector <float> params, vector <State> states, Mat Jdijs, Mat dijs)
+{
+	Mat xNew;
+	Mat x = convertSTLvector2Mat(params, static_cast<int>(params.size()), 1, CV_32F);
+	Mat Jinv;
+	invert(Jdijs.t() * Jdijs, Jinv); // Pseudo inverse
+	Mat err = Jinv * Jdijs.t() * dijs; // error
+	for (int i = 0; i < states.size(); i++)
+	{
+		if ((states[i] >= 3) && (states[i] <= 5))
+		{
+			err.at<float>(i, 0) = rad2deg(err.at<float>(i, 0)); // Angle parameters convert to degrees
+		}
+	}
+	xNew = x - err; // Remove error from parameters
+
+	return xNew;
+}
+
+// Dimensions of inputs, are not equal
+template <typename T>
+void errorSize(string input1, string input2, T size1, T size2, string filename, int line)
+{
+	int pos = static_cast<int>(filename.find_last_of("\\"));
+	
+	cout << input1 << " and " << input2 << " matrices must have the same size; " << endl;
+	cout << input1 << ".size = " << size1 << " != " << input2 <<".size = " << size2 << endl;
+	cout << "File: " << filename.substr(pos + 1, string::npos) << "; Line: " << line << endl;
+	system("PAUSE");
+	exit(EXIT_FAILURE);
 }

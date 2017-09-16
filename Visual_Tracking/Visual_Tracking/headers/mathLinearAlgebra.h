@@ -15,10 +15,13 @@
 
 #define PI 3.14159265f
 
+enum PartialDeriv { Dx, Dy };
+
 using namespace cv;
 using namespace std;
 
 #include "rotations3D.h"
+#include "error.h"
 
 // Returns the Euclidean norm of a 3D vector
 float norm2(Vec3f vec);
@@ -52,3 +55,54 @@ Vec4f cart2hmgns(Vec3f carte);
 
 // Check if the input matrix has the desirable dimensions
 bool checkMatrixSize(Size size, int rows, int cols);
+
+
+// Vector calculus
+
+// Parameters of the D(x) distance function 
+enum Parameter { X0, X1, X2, X3, X4, X5 };
+
+// Compute the Jacobian matrix of the perspective projection process
+// in respect to the parameters xk. 
+// Inputs: matrix V = { 3D points }
+//		   matrix K = { camera extrinsics }
+//         vector xk = { parameters }
+//         vector x = { parameters values }
+// Output: matrix Jvh = { Jacobian matrix with the 3D projection homogeneous points }
+Mat jacobianPerspectiveProjection(Mat V, Mat K, Mat x, vector <Parameter> xk);
+
+// Compute the Jacobian matrix of the pixel coordinates
+// Inputs: matrix Vph = { 3D homogeneours projection points }
+//		   matrix Jvh = { first derivatives of projection homogeneous coordinates }
+// Output: matrix Jvp = { first derivatives of pixel coordinates }
+Mat jacobianPixelCoordinates(Mat Vph, Mat Jvh);
+
+// Compute the Jacobian matrix of the 2D edges
+// Inputs: matrix Jvp = { 2D projection points first derivatives}
+//		   vector edges2DPtr = { pointers to 2D projection vertices }
+// Output: matrix Jep = { first derivatives of 2D edges }
+Mat jacobianEdges(Mat Jvp, vector <vector <int>> edges2DPtr);
+
+// Compute mijs first derivatives
+Mat jacobianMijs(Mat Jep, int mNum);
+
+// Compute first derivatives of distances dijs
+Mat jacobianDijs(Mat mijs, Mat Jmijs, Mat dxDist, Mat dyDist);
+
+// Compose camera's pose matrix first derivative
+Mat cameraPoseFirstDerivative(Mat x, Parameter xk);
+
+// Return camera position vector first derivative in respect of the state parameters
+Mat cameraPositionFirstDerivative(Parameter xk);
+
+// Return camera rotation matrix first derivative in respect of the state parameters
+Mat cameraRotationFirstDerivative(Parameter xk, Mat x);
+
+// Return rotation matrix first derivative in respect parameter xk
+Mat rotationFirstDerivative(Parameter xk, float theta);
+
+// Computer the first derivative of the inverse of 3D rotation matrix
+Mat inverseRotationMatrixDerivative(Mat R, Mat dR);
+
+// Image gradient to one direction
+Mat imageGradient(Mat Img, PartialDeriv partial);

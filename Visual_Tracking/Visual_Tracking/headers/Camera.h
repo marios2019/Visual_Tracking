@@ -12,7 +12,7 @@
 
 #define PI 3.14159265f
 #define DEG 360.f
-#define K 500.f // Pixels quantity per metric unit
+#define Kp 500.f // Pixels quantity per metric unit
 
 using namespace cv;
 using namespace std;

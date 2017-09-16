@@ -7,7 +7,7 @@ Camera::Camera(Vec3f tVal, Vec3f rVal, Point2f principalVal, float fovVal, float
 	principalPoint = principalVal;
 	fov = fmod(fmod(fovVal, DEG) + DEG, DEG);
 	focalPixels = checkFocal(focalPixelsVal);
-	focalMetric = focalPixelsVal / K;
+	focalMetric = focalPixelsVal / Kp;
 	width = static_cast<int>(2.f * focalPixelsVal * tan(deg2rad(fovVal / 2.f)));
 }
 
@@ -32,7 +32,7 @@ void Camera::setFov(float fovVal)
 {
 	fov = fmod(fmod(fovVal, DEG) + DEG, DEG);
 	focalPixels = static_cast<float>(width) / (2.f * tan(deg2rad(fov / 2.f)));
-	focalMetric = focalPixels / K;
+	focalMetric = focalPixels / Kp;
 }
 
 // Return fov
@@ -45,7 +45,7 @@ float Camera::getFov() const
 void Camera::setFocalPixels(float focalPixelsVal)
 {
 	focalPixels = checkFocal(focalPixelsVal);
-	focalMetric = focalPixels / K;
+	focalMetric = focalPixels / Kp;
 	fov = 2.f * rad2deg(atan2f(static_cast<float>(width), 2.f * focalPixels));
 }
 
@@ -59,7 +59,7 @@ float Camera::getFocalPixels() const
 void Camera::setFocalMetric(float focalMetricVal)
 {
 	focalMetric = checkFocal(focalMetricVal);
-	focalPixels = K * focalMetric;
+	focalPixels = Kp * focalMetric;
 	fov = 2.f * rad2deg(atan2f(static_cast<float>(width), 2.f * focalPixels));
 }
 

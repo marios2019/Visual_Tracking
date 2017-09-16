@@ -12,6 +12,7 @@ void errorExit(string err, int limit, ErrCode code)
 		case MEMORY:
 		{
 			cout << err << " : invalid memory access; valid indices -> 0 ... " << (limit-1) << endl;
+			break;
 		}
 		default:
 		{

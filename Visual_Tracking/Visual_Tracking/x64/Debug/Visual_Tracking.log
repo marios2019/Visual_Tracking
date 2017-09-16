@@ -1,8 +1,5 @@
 ﻿  Source.cpp
-  Generating Code...
-  Compiling...
-  visualTracking.cpp
-d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\source_code\visualtracking.cpp(583): warning C4244: 'argument': conversion from 'double' to 'int', possible loss of data
+  Camera.cpp
   Generating Code...
   Visual_Tracking.vcxproj -> D:\MegaSync\ΜΕΠ\GitHub Repos\Visual_Tracking\Visual_Tracking\x64\Debug\Visual_Tracking.exe
   Visual_Tracking.vcxproj -> D:\MegaSync\ΜΕΠ\GitHub Repos\Visual_Tracking\Visual_Tracking\x64\Debug\Visual_Tracking.pdb (Full PDB)

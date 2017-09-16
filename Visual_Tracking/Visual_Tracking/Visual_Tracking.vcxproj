@@ -149,8 +149,6 @@
     <ClCompile Include="class_definitions\CameraStateSpace.cpp" />
     <ClCompile Include="class_definitions\Cuboid2D.cpp" />
     <ClCompile Include="class_definitions\Cuboid3D.cpp" />
-    <ClCompile Include="class_definitions\Distance.cpp" />
-    <ClCompile Include="class_definitions\DistClosedForm.cpp" />
     <ClCompile Include="source_code\controls.cpp" />
     <ClCompile Include="source_code\error.cpp" />
     <ClCompile Include="source_code\mathLinearAlgebra.cpp" />
@@ -162,8 +160,6 @@
     <ClInclude Include="headers\CameraStateSpace.h" />
     <ClInclude Include="headers\controls.h" />
     <ClInclude Include="headers\Cuboid2D.h" />
-    <ClInclude Include="headers\Distance.h" />
-    <ClInclude Include="headers\DistClosedForm.h" />
     <ClInclude Include="headers\error.h" />
     <ClInclude Include="headers\mathLinearAlgebra.h" />
     <ClInclude Include="headers\projectiveGeometry.h" />

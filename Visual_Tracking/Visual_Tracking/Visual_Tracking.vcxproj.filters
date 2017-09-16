@@ -24,13 +24,7 @@
     <ClCompile Include="class_definitions\Cuboid2D.cpp">
       <Filter>Resource Files\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="class_definitions\Distance.cpp">
-      <Filter>Resource Files\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="class_definitions\CameraStateSpace.cpp">
-      <Filter>Resource Files\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="class_definitions\DistClosedForm.cpp">
       <Filter>Resource Files\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="source_code\visualTracking.cpp">
@@ -71,13 +65,7 @@
     <ClInclude Include="headers\Cuboid2D.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="headers\Distance.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="headers\CameraStateSpace.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="headers\DistClosedForm.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="headers\controls.h">

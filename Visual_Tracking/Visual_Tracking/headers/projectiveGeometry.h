@@ -4,5 +4,3 @@
 // Euclidean Geometry, to 2D Projetive Geometry
 #include "Cuboid3D.h"
 #include "Cuboid2D.h"
-#include "Distance.h"
-#include "DistClosedForm.h"

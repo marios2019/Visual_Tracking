@@ -64,7 +64,7 @@ void CameraStateSpace::setThetaX(float thetaXVal, Angle angle)
 	// Degrees
 	if (angle == DEGREES)
 	{
-		thetaX = fmod(thetaXVal, DEG) * PI / 180.f;
+		thetaX = deg2rad(fmod(thetaXVal, DEG));
 		return;
 	}
 
@@ -78,7 +78,7 @@ void CameraStateSpace::setThetaY(float thetaYVal, Angle angle)
 	// Degrees
 	if (angle == DEGREES)
 	{
-		thetaY = fmod(thetaYVal, DEG) * PI / 180.f;
+		thetaY = deg2rad(fmod(thetaYVal, DEG));
 		return;
 	}
 
@@ -92,7 +92,7 @@ void CameraStateSpace::setThetaZ(float thetaZVal, Angle angle)
 	// Degrees
 	if (angle == DEGREES)
 	{
-		thetaZ = fmod(thetaZVal, DEG) * PI / 180.f;
+		thetaZ = deg2rad(fmod(thetaZVal, DEG));
 		return;
 	}
 
@@ -106,7 +106,7 @@ float CameraStateSpace::getThetaX(Angle angle) const
 	// Degrees
 	if (angle == DEGREES)
 	{
-		return thetaX * 180.f / PI;
+		return rad2deg(thetaX);
 	}
 
 	// Radians
@@ -119,7 +119,7 @@ float CameraStateSpace::getThetaY(Angle angle) const
 	// Degrees
 	if (angle == DEGREES)
 	{
-		return thetaY * 180.f / PI;
+		return rad2deg(thetaY);
 	}
 	
 	// Radians
@@ -132,7 +132,7 @@ float CameraStateSpace::getThetaZ(Angle angle) const
 	// Degrees
 	if (angle == DEGREES)
 	{
-		return thetaZ * 180.f / PI;
+		return rad2deg(thetaZ);
 	}
 
 	// Radians
@@ -185,7 +185,7 @@ vector <float> CameraStateSpace::getParams(vector <State> stateVal)
 // Get all camera parameters values
 vector <float> CameraStateSpace::getParams()
 {
-	return getParams(state);
+	return	{ getTx(), getTy(), getTz(), getThetaX(DEGREES), getThetaY(DEGREES), getThetaZ(DEGREES) };
 }
 
 // Enable state parameters
