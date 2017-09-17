@@ -7,12 +7,13 @@ void visualTracker(Cuboid3D &model, Cuboid3D &Data, int width, int height)
 	vector <State> state = { X, Y, Z, THETAX, THETAY, THETAZ };
 	float fov = 60.f;
 	vector <float> defaultParams = { TX, TY, TZ, RX, RY, RZ, MNUM };
-	int iterations = 1, maxIterations = 10; // Number of non linear fitting iterations
+	int iterations = 1, maxIterations = 5; // Number of non linear fitting iterations
 	bool exitFlag = false; // If true, exit application
 	bool updateFlag = true; // If true render again cuboids
 	bool fitFlag = false; // If true start non linear fitting
+	bool demoFlag = false; // If true start demo
 	int mNum = MNUM;
-
+	
 	// Virtual camera initialization
 	Camera virtualCam = createCam(Vec3f(TX, TY, TZ), Vec3f(RX, RY, RZ), fov, width, height, state);
 	// Real camera initialization	
@@ -25,17 +26,17 @@ void visualTracker(Cuboid3D &model, Cuboid3D &Data, int width, int height)
 	Mat dataImage(height, width, CV_8UC3, CV_RGB(255, 255, 255));
 	// Distances first partial derivatives
 	Mat Jdijs, dijs;
-
+	chrono::duration<double> elapsed;
 	while (!exitFlag)
 	{
-		if (updateFlag)
+		if (updateFlag) // Update image planes
 		{
 			//Update frame
 			Cuboid2D modelProjection = updateFrame(virtualCam, realCam, model, Data, imagePlane, imagePlaneModel, imagePlaneData, dataImage);
 			// Disimillarity between data and model object
 			Mat distTransform, mijs;
 			dissimilarity(modelProjection, imagePlane, dataImage, mNum, mijs, dijs, distTransform);
-			cout << "Error: " << dijs.t() * dijs << endl;
+			//cout << "Error: " << dijs.t() * dijs << endl;
 
 			// Display Model - Data dissimilarity
 			dispImagePlane("Model - Data image plane", imagePlane);
@@ -46,25 +47,48 @@ void visualTracker(Cuboid3D &model, Cuboid3D &Data, int width, int height)
 			// in respect to the state parameters of the camera - extrinsics parameters
 			Jdijs = computeModelFirstDerivatives(model, modelProjection, virtualCam, mijs, distTransform);
 		}
-		if (fitFlag)
+
+		if (fitFlag) // Fit model to data
 		{
+#ifdef COUNT_TIME
+			auto start = chrono::high_resolution_clock::now();
+#endif			
 			// Calculate new extrinsics matrix with smaller error according to data
 			if (iterations == maxIterations)
 			{
-				fitFlag = false;
 				iterations = 1;
+				fitFlag = false;
+
+#ifdef DEMO
+				if (demoFlag) // Demo
+				{
+					demoFlag = demo(realCam);
+					fitFlag = true;
+					updateFlag = true;
+				}				
+#endif
+#ifdef COUNT_TIME
+				cout << "Elapsed time: " << elapsed.count() << " s\n";
+				elapsed = elapsed.zero();
+#endif
 			}
 			
+			// Use non linear fitting to estimate new parameters for virtual camera
 			vector <float> xNew = fittingGaussNewton(virtualCam.getParams(virtualCam.getStates()), virtualCam.getStates(), Jdijs, dijs);
 			virtualCam.setParams(xNew, virtualCam.getStates(), DEGREES);
 			++iterations;
+#ifdef COUNT_TIME
+			auto finish = chrono::high_resolution_clock::now();
+			elapsed += finish - start;
+#endif
 		}
 		else
 		{
 			// Keys pressed handler
-			keyboardHandler(virtualCam, realCam, model, Data, mNum, defaultParams, exitFlag, updateFlag, fitFlag);
+			keyboardHandler(virtualCam, realCam, model, Data, mNum, defaultParams, exitFlag, updateFlag, fitFlag, demoFlag);
 			Jdijs.release();
 			dijs.release();
+			elapsed = elapsed.zero();
 		}
 	}
 }
@@ -130,7 +154,7 @@ Cuboid2D rendering(Cuboid3D &cuboid3D, Camera camera, Mat &imagePlane, Mat &imag
 	resetVisibility(cuboid3D);
 
 	// Perspective projection matrix
-	Mat P = camera.getIntrinsics() * camera.getExtrinsics();
+	Mat P = camera.getIntrinsics() * camera.getExtrinsics(AXISANGLE);
 
 	// Project vertices to image plane
 	for (int i = 0; i < cuboid3D.getVerticesSize(); i++)
@@ -179,11 +203,8 @@ void dissimilarity(Cuboid2D model, Mat &imagePlane, Mat dataImage, int mNum, Mat
 	// Calculate edges subintervals
 	mijs = edgesSubIntervals(edgesVec, edgesVertices, mNum);
 
-	// Calculate normal lines for each mij, according to the edge normal
-	Mat mijNormalLines = subIntervalsNormals(mijs, edgesNormals, offset, imagePlane.size());
-
 	// Draw mijs
-	drawMijs(mijs, mijNormalLines, imagePlane);
+	drawMijs(mijs, imagePlane);
 
 	// Calculate distance transform
 	distTransform = computeDistanceTransform(dataImage);
@@ -489,22 +510,15 @@ Mat subIntervalsNormals(Mat mijs, Mat edgesNormals, float offset, Size size)
 }
 
 // Draw mijs and mijs normal lines on each edge of the model
-void drawMijs(Mat mijs, Mat mijsNormalLines, Mat &imagePlane)
+void drawMijs(Mat mijs, Mat &imagePlane)
 {
 	Vec3b colour = Vec3b(0, 0, 0);
-
-	if (mijs.size() != mijsNormalLines.size())
-	{
-		errorSize("mijs", "mijsNormalLines", mijs.size(), mijsNormalLines.size(), __FILE__, __LINE__ - 8);
-	}
 
 	for (int j = 0; j < mijs.cols; j++)
 	{
 		for (int i = 0; i < mijs.rows; i++)
 		{
 			circle(imagePlane, mijs.at<Point2f>(i, j), 2, colour, -1, 8);
-			Vec4f normalLine = mijsNormalLines.at<Vec4f>(i, j);
-			line(imagePlane, Point2f(normalLine.val[0], normalLine.val[1]), Point2f(normalLine.val[2], normalLine.val[3]), colour, 1, CV_AA);
 		}
 	}
 }
@@ -557,50 +571,6 @@ Mat calculateDistance(Mat mijs, Mat distTransform)
 	}
 
 	return dijs;
-}
-
-// Find the interpolated intersection with the data edge
-Mat findIntersection(Vec4f mijNormalLine, Mat imagePlaneData, vector <float> &weights)
-{
-	Point2f p1(mijNormalLine.val[0], mijNormalLine.val[1]), p2(mijNormalLine.val[1], mijNormalLine.val[2]);
-	Vec2f mijNormalVector(p2 - p1);
-	int mijNormalLength = static_cast<int>(norm2(mijNormalVector));
-	float maxValue = 765.f;
-	vector <Point2f> sijPoints;
-	int pointer = 0, continuous = 0;
-	bool first = false;
-	
-	for (int i = 0; i <= mijNormalLength; i++)
-	{
-		// Find the pixel with the smallest value
-		Point2f pmijNormal = p1 + static_cast<Point2f>(mijNormalVector) * (static_cast<float>(i) / mijNormalLength);
-		Vec3b pixel = imagePlaneData.at<Vec3b>(pmijNormal);
-		float pixelValue = static_cast<float>(pixel.val[0] + pixel.val[1] + pixel.val[2]);
-		if (pixelValue < maxValue)
-		{
-			// First interpolation
-			if (!first)
-			{
-				first = true;
-			}
-			pointer = i;
-			if (pointer == continuous + 1)
-			{
-				weights.push_back(pixelValue / 765.f);
-				sijPoints.push_back(pmijNormal);
-				continuous = i;
-			}
-		}
-		else
-		{
-			if (!first)
-			{
-				continuous = i;
-			}
-		}
-	}
-
-	return convertSTLvector2Mat(sijPoints, static_cast<int>(sijPoints.size()), 1, CV_32FC2);
 }
 
 // Compute distance transform gradient
@@ -666,4 +636,41 @@ void errorSize(string input1, string input2, T size1, T size2, string filename, 
 	cout << "File: " << filename.substr(pos + 1, string::npos) << "; Line: " << line << endl;
 	system("PAUSE");
 	exit(EXIT_FAILURE);
+}
+
+// Demo
+bool demo(Camera &realCam)
+{
+	static int iter = 0;
+	int maxIter = 200;
+	
+	++iter;
+	if (iter == maxIter)
+	{// stop demo
+		iter = 0;
+		return false;
+	}
+	else
+	{// Move realCam
+		
+		vector <float> params = realCam.getParams();
+		
+		if (iter < (maxIter / 2))
+		{
+			params[0] -= 0.5f;
+		}
+		else
+		{
+			params[0] -= 0.5f;
+			params[4] -= 0.75f;
+			params[1] += 0.25f;
+			params[5] -= 0.25f;
+			params[2] -= 0.25f;
+		}
+		
+
+		realCam.setParams(params, { X, Y, Z, THETAX, THETAY, THETAZ }, DEGREES);
+		
+		return true;
+	}
 }

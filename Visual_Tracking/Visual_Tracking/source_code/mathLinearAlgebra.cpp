@@ -301,7 +301,7 @@ Mat cameraPoseFirstDerivative(Mat x, Parameter xk)
 		t.push_back(x.row(i));
 	}
 	// Camera rotation matrix
-	Mat R = rotationEuler(deg2rad(x.at<float>(3, 0)), deg2rad(x.at<float>(4, 0)), deg2rad(x.at<float>(5, 0)));
+	Mat R = eulerAngles2Matrix(x.at<float>(3, 0), x.at<float>(4, 0), x.at<float>(5, 0));
 
 	// Camera's position vector and rotation matrix first derivatives
 	Mat dt = cameraPositionFirstDerivative(xk);

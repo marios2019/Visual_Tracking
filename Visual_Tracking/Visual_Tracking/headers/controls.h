@@ -23,4 +23,4 @@ using namespace std;
 void dispCamParams(Camera virtualCam, Camera realCam);
 
 // Keys pressed handler - case sensitive
-void keyboardHandler(Camera &virtualCam, Camera &realCam, Cuboid3D &model, Cuboid3D &Data, int &mNum, vector <float> defaultParams, bool &exitFlag, bool &updateFlag, bool &fitFlag);
+void keyboardHandler(Camera &virtualCam, Camera &realCam, Cuboid3D &model, Cuboid3D &Data, int &mNum, vector <float> defaultParams, bool &exitFlag, bool &updateFlag, bool &fitFlag, bool &demoFlag);

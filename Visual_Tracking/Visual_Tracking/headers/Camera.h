@@ -17,6 +17,8 @@
 using namespace cv;
 using namespace std;
 
+enum Rotation { EULER, AXISANGLE };
+
 class Camera: public CameraStateSpace
 {
 public:
@@ -39,11 +41,11 @@ public:
 	Vec3f getPosition() const; // Return camera position
 	
 	void setRotation(Mat RVal); // Set camera rotation
-	Mat getRotation() const; // Return rotation matrix
+	Mat getRotation(Rotation type ) const; // Return rotation matrix
 	
 	void setExtrinsics(Mat EVal); // Set camera extrinsics
 	Mat getIntrinsics() const; // Return camera intrinsics matrix
-	Mat getExtrinsics(); // Return camera extrinsics matrix
+	Mat getExtrinsics(Rotation type); // Return camera extrinsics matrix
 	
 	Mat getLieAlgebraDerivative(int idx); // Return projection first derivative with respect of the i-th
 											// se(3) Lie algebra generator.

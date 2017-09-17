@@ -12,7 +12,7 @@
 #include <vector>
 #include <algorithm>
 #include <cmath> 
-#include <time.h>
+#include <chrono>  // for high_resolution_clock
 
 using namespace cv;
 using namespace std;
@@ -23,6 +23,25 @@ using namespace std;
 #include "mathLinearAlgebra.h"
 #include "controls.h"
 
+// Number of mijs
+#define MNUM 5
+
+//#define IMSHOW
+//#define COUNT_TIME
+#define DEMO
+
+#ifdef DEMO
+
+// Virtual Camera default extrinsics parameters
+#define TX 19.f
+#define TY 18.f
+#define TZ 80.f
+#define RX 160.f
+#define RY -11.f
+#define RZ 0.f
+
+#else
+
 // Virtual Camera default extrinsics parameters
 #define TX -28.f
 #define TY 30.f
@@ -31,11 +50,7 @@ using namespace std;
 #define RY -30.f
 #define RZ 0.f
 
-// Number of mijs
-#define MNUM 5
-
-//#define IMSHOW;
-
+#endif
 // Visual tracker main function
 void visualTracker(Cuboid3D &model, Cuboid3D &Data, int width, int height);
 
@@ -95,7 +110,7 @@ Mat edgesSubIntervals(Mat edgesVec, vector<vector<Point2f>> edgesVertices, int m
 Mat subIntervalsNormals(Mat mijs, Mat edgesNormals, float offset, Size size);
 
 // Draw mijs and mijs normal lines on each edge of the model
-void drawMijs(Mat mijs, Mat mijsNormalLines, Mat & imagePlane);
+void drawMijs(Mat mijs, Mat & imagePlane);
 
 // Compute the distance transform for the data object
 Mat computeDistanceTransform(Mat dataImage);
@@ -105,9 +120,6 @@ Mat normalise(Mat Img);
 
 // Calculate distance from each mij to data
 Mat calculateDistance(Mat mijs, Mat distTransform);
-
-// Find the interpolated intersection with the data edge
-Mat findIntersection(Vec4f mijNormalLine, Mat imagePlaneData, vector <float> &weights);
 
 // Compute distance transform gradient
 void distTransformImageGradient(Mat distTransform, Mat & dxdist, Mat & dydist);
@@ -121,3 +133,6 @@ vector<float> fittingGaussNewton(vector<float> params, vector<State> states, Mat
 // Dimensions of inputs, are not equal
 template<typename T>
 void errorSize(string input1, string input2, T size1, T size2, string filename, int line);
+
+// Demo
+bool demo(Camera & realCam);

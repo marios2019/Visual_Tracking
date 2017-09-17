@@ -89,9 +89,9 @@ void Camera::setRotation(Mat RVal)
 	if (IsRotationMatrix(RVal))
 	{
 		Vec3f eulerAngles(matrix2euler(RVal));
-		setThetaX(eulerAngles.val[0], RADIANS);
-		setThetaY(eulerAngles.val[1], RADIANS);
-		setThetaZ(eulerAngles.val[2], RADIANS);
+		setThetaX(eulerAngles.val[0], DEGREES);
+		setThetaY(eulerAngles.val[1], DEGREES);
+		setThetaZ(eulerAngles.val[2], DEGREES);
 	}
 	else
 	{
@@ -100,9 +100,16 @@ void Camera::setRotation(Mat RVal)
 }
 
 // Return rotation matrix
-Mat Camera::getRotation() const
+Mat Camera::getRotation(Rotation type) const
 {
-	return rotationEuler(getThetaX(RADIANS), getThetaY(RADIANS), getThetaZ(RADIANS));
+	if (type == EULER) // Get rotation matrix from euler angles
+	{
+		return eulerAngles2Matrix(getThetaX(DEGREES), getThetaY(DEGREES), getThetaZ(DEGREES));
+	}
+	else // Get rotation matrix from axis angles
+	{
+		return axisAngle2Matrix(euler2AxisAngle(getThetaX(DEGREES), getThetaY(DEGREES), getThetaZ(DEGREES)));
+	}
 }
 
 // Set camera extrinsics matrix - overload
@@ -132,11 +139,11 @@ Mat Camera::getIntrinsics() const
 }
 
 // Return camera extrinsics matrix
-Mat Camera::getExtrinsics()
+Mat Camera::getExtrinsics(Rotation type)
 {
 	// Trasnpose Rotation Matrix
 	Mat Rt;
-	transpose(getRotation(), Rt);
+	transpose(getRotation(type), Rt);
 	// Trasnpose Rotation Matrix multiplied by vector T - camera position
 	Mat tmp = -Rt * Mat(getPosition());
 	Vec3f RtT = Vec3f(tmp);
@@ -148,7 +155,7 @@ Mat Camera::getExtrinsics()
 // se(3) Lie algebra generator.
 Mat Camera::getLieAlgebraDerivative(int idx)
 {
-	return getIntrinsics() * getExtrinsics() * getGenerator(idx);
+	return getIntrinsics() * getExtrinsics(EULER) * getGenerator(idx);
 }
 
 // Get i-th se(3) Lie algebra generator

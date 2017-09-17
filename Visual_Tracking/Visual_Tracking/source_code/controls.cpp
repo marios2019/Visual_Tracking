@@ -17,14 +17,14 @@ void dispCamParams(Camera virtualCam, Camera realCam)
 	string values = "Tx: " + to_string(virtualCam.getTx()) + " Ty: " + to_string(virtualCam.getTy()) + " Tz: " + to_string(virtualCam.getTz());
 	putText(virtualValues, values, cvPoint(0, 20), font, fontScale, colour, thickness, lineType);
 	values.clear();
-	values = "Rx: " + to_string(virtualCam.getThetaX(DEGREES)) + " Ry: " + to_string(-virtualCam.getThetaY(DEGREES)) + " Rz: " + to_string(-virtualCam.getThetaZ(DEGREES));
+	values = "Rx: " + to_string(virtualCam.getThetaX(DEGREES)) + " Ry: " + to_string(virtualCam.getThetaY(DEGREES)) + " Rz: " + to_string(virtualCam.getThetaZ(DEGREES));
 	putText(virtualValues, values, cvPoint(0, 50), font, fontScale, colour, thickness, lineType);
 	values.clear();
 	// Real Camaera Parameters
 	values = "Tx: " + to_string(realCam.getTx()) + " Ty: " + to_string(realCam.getTy()) + " Tz: " + to_string(realCam.getTz());
 	putText(realValues, values, cvPoint(0, 20), font, fontScale, colour, thickness, lineType);
 	values.clear();
-	values = "Rx: " + to_string(realCam.getThetaX(DEGREES)) + " Ry: " + to_string(-realCam.getThetaY(DEGREES)) + " Rz: " + to_string(-realCam.getThetaZ(DEGREES));
+	values = "Rx: " + to_string(realCam.getThetaX(DEGREES)) + " Ry: " + to_string(realCam.getThetaY(DEGREES)) + " Rz: " + to_string(realCam.getThetaZ(DEGREES));
 	putText(realValues, values, cvPoint(0, 50), font, fontScale, colour, thickness, lineType);
 	// Show camera parameters
 	const char* virtualCamParams = "Virtual Camera Parameters";
@@ -35,7 +35,7 @@ void dispCamParams(Camera virtualCam, Camera realCam)
 }
 
 // Keys pressed handler - case sensitive
-void keyboardHandler(Camera &virtualCam, Camera &realCam, Cuboid3D &model, Cuboid3D &Data, int &mNum, vector <float> defaultParams, bool &exitFlag, bool &updateFlag, bool &fitFlag)
+void keyboardHandler(Camera &virtualCam, Camera &realCam, Cuboid3D &model, Cuboid3D &Data, int &mNum, vector <float> defaultParams, bool &exitFlag, bool &updateFlag, bool &fitFlag, bool &demoFlag)
 {
 	static bool renderEdges = true;
 	static int edge = 0;
@@ -234,6 +234,12 @@ void keyboardHandler(Camera &virtualCam, Camera &realCam, Cuboid3D &model, Cuboi
 		defaultParams[0] += 2.f;
 		realCam.setParams({ defaultParams.begin(), defaultParams.end() - 1 }, defaultState, DEGREES);
 		updateFlag = true;
+		break;
+	}
+	case 8: // BACKSPACE key pressed - start demo
+	{
+		fitFlag = true;
+		demoFlag = true;
 		break;
 	}
 	case 9: // TAB key pressed - choose primitives to be rendered
