@@ -1,6 +1,8 @@
-﻿  Source.cpp
+﻿  visualTracking.cpp
   Generating code
-  All 997 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  35 of 1584 functions ( 2.2%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    4 functions had inline decision re-evaluated but remain unchanged
   Finished generating code
-  Visual_Tracking.vcxproj -> c:\users\marios\documents\visual studio 2015\Projects\Visual_Tracking\x64\Release\Visual_Tracking.exe
-  Visual_Tracking.vcxproj -> c:\users\marios\documents\visual studio 2015\Projects\Visual_Tracking\x64\Release\Visual_Tracking.pdb (Full PDB)
+  Visual_Tracking.vcxproj -> D:\MegaSync\ΜΕΠ\GitHub Repos\Visual_Tracking\Visual_Tracking\x64\Release\Visual_Tracking.exe
+  Visual_Tracking.vcxproj -> D:\MegaSync\ΜΕΠ\GitHub Repos\Visual_Tracking\Visual_Tracking\x64\Release\Visual_Tracking.pdb (Full PDB)

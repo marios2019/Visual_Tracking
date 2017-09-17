@@ -64,11 +64,11 @@
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="OpenCV_Debug.props" />
+    <Import Project="OpenCV_Debug_UCY.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="Opencv_Release.props" />
+    <Import Project="OpenCV_Release_UCY.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -141,10 +141,33 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <ForceFileOutput>MultiplyDefinedSymbolOnly</ForceFileOutput>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Source.cpp" />
+    <ClCompile Include="class_definitions\Camera.cpp" />
+    <ClCompile Include="class_definitions\CameraStateSpace.cpp" />
+    <ClCompile Include="class_definitions\Cuboid2D.cpp" />
+    <ClCompile Include="class_definitions\Cuboid3D.cpp" />
+    <ClCompile Include="source_code\controls.cpp" />
+    <ClCompile Include="source_code\error.cpp" />
+    <ClCompile Include="source_code\mathLinearAlgebra.cpp" />
+    <ClCompile Include="source_code\rotations3D.cpp" />
+    <ClCompile Include="source_code\Source.cpp" />
+    <ClCompile Include="source_code\visualTracking.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="headers\CameraStateSpace.h" />
+    <ClInclude Include="headers\controls.h" />
+    <ClInclude Include="headers\Cuboid2D.h" />
+    <ClInclude Include="headers\error.h" />
+    <ClInclude Include="headers\mathLinearAlgebra.h" />
+    <ClInclude Include="headers\projectiveGeometry.h" />
+    <ClInclude Include="headers\cameraCalibration.h" />
+    <ClInclude Include="headers\Camera.h" />
+    <ClInclude Include="headers\Cuboid3D.h" />
+    <ClInclude Include="headers\rotations3D.h" />
+    <ClInclude Include="headers\visualTracking.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
