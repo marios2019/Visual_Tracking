@@ -6,7 +6,7 @@
 #include <iostream>
 #include <vector>
 
-#define VERTICES 8
+#define _VERTICES 8
 
 using namespace cv;
 using namespace std;
@@ -25,8 +25,8 @@ public:
 	~Cuboid2D(); // Destructor
 
 	Point3f getHomogeneousVertex(int idx); // Returns a homogeneous vertex of the cuboid2d
-	vector <Point3f> getHomogeneousVertices() const; // Returns a vector of cuboid2d homogeneous vertices
-	int getHomogeneousVerticesSize() const; // Returns the number of vertices homogeneous
+	vector <Point3f> getHomogeneousVertices() const; // Returns a vector of cuboid2d homogeneous _VERTICES
+	int getHomogeneousVerticesSize() const; // Returns the number of _VERTICES homogeneous
 	
 	void setEdge(vector <Point2f> edgeVal, vector <int> edgeVerticesVal); // Set edge to be rendered
 	void destroyEdge(int idx); // Destroy edge[idx]
@@ -42,18 +42,18 @@ public:
 	vector <vector <int>> getSurfaces() const; // Returns a vector of cuboid2d surfaces
 	size_t getSurfacesSize() const; // Returns the number of surfaces
 
-	void setVerticesPxl(vector <Point2f> verticesPixelVal); // Change verticesPixel vector
-	void setVertexPxl(Point2f verticesPixelVal, int idx); // Change vertexPixel[idx] value
-	Point2f getVertexPxl(int idx); // Returns a vertex of the cuboid2d, in pixel coordinates
-	vector <Point2f> getVerticesPxl() const; // Returns a vector of cuboid2d vertices, in pixel coordinates
-	size_t getVerticesPxlSize() const; // Returns the number of verticesPixel
+	void setVerticesPxl(vector <Point2f> vertices_PIxelVal); // Change vertices_PIxel vector
+	void setVertexPxl(Point2f vertices_PIxelVal, int idx); // Change vertex_PIxel[idx] value
+	Point2f getVertexPxl(int idx); // Returns a vertex of the cuboid2d, in _PIxel coordinates
+	vector <Point2f> getVerticesPxl() const; // Returns a vector of cuboid2d _VERTICES, in _PIxel coordinates
+	size_t getVerticesPxlSize() const; // Returns the number of vertices_PIxel
 
 private:
-	vector <Point3f> homogeneousVertices; // vertices of the cuboid2d, in homogeneous coordinates
+	vector <Point3f> homogeneousVertices; // _VERTICES of the cuboid2d, in homogeneous coordinates
 	vector <vector <Point2f>> edges; // edges of the cuboid2d, projected in the image plane
 	vector <vector <int>> surfaces; // surfaces of the cuboid2d, projected in the image plane
-	vector <vector <int>> edgesPtr; // pointers to the vertices of the cuboid2d
-	vector <Point2f> verticesPixel; // vertices of the cuboid2d, in pixel coordinates
+	vector <vector <int>> edgesPtr; // pointers to the _VERTICES of the cuboid2d
+	vector <Point2f> vertices_PIxel; // _VERTICES of the cuboid2d, in _PIxel coordinates
 
-	bool setEdgePtr(vector <int> edgeVerticesVal); // Set edgeVertices pointer to verticesPixel
+	bool setEdgePtr(vector <int> edgeVerticesVal); // Set edgeVertices pointer to vertices_PIxel
 };

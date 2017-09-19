@@ -24,33 +24,30 @@ using namespace std;
 #include "controls.h"
 
 // Number of mijs
-#define MNUM 5
+#define _MNUM 5
 
-//#define IMSHOW
-//#define COUNT_TIME
-#define DEMO
+//#define _IMSHOW
+//#define _COUNT_TIME
+#define _DEMO
 
-#ifdef DEMO
-
+#ifdef _DEMO
 // Virtual Camera default extrinsics parameters
-#define TX 19.f
-#define TY 18.f
-#define TZ 80.f
-#define RX 160.f
-#define RY -11.f
-#define RZ 0.f
-
+#define _TX 27.f
+#define _TY 18.f
+#define _TZ 80.f
+#define _RX 160.f
+#define _RY -11.f
+#define _RZ 0.f
 #else
-
 // Virtual Camera default extrinsics parameters
-#define TX -28.f
-#define TY 30.f
-#define TZ 80.f
-#define RX 160.f
-#define RY -30.f
-#define RZ 0.f
-
+#define _TX -28.f
+#define _TY 30.f
+#define _TZ 80.f
+#define _RX 160.f
+#define _RY -30.f
+#define _RZ 0.f
 #endif
+
 // Visual tracker main function
 void visualTracker(Cuboid3D &model, Cuboid3D &Data, int width, int height);
 
@@ -58,7 +55,7 @@ void visualTracker(Cuboid3D &model, Cuboid3D &Data, int width, int height);
 void modelData(float &length, float &height, float &width);
 
 // Render function
-Cuboid2D rendering(Cuboid3D &cuboid3D, Camera camera, Mat &imagePlane, Mat &imagePlaneObj, string type);
+Cuboid2D rendering(Cuboid3D &cuboid3D, Camera &camera, Mat &imagePlane, Mat &imagePlaneObj, string type);
 
 // Dissimilarity between data and model object
 void dissimilarity(Cuboid2D model, Mat &imagePlane, Mat dataImage, int mNum, Mat &mijs, Mat &dijs, Mat &distTransform);
@@ -69,7 +66,7 @@ void drawObj(Cuboid2D objProjection, Mat &imagePlane, Mat &imagePlaneObj, Vec3b 
 // Check which parts of the object are visible from the camera's given viewpoint
 void visibilityCulling(Cuboid3D &cuboid3D, Cuboid2D &cuboid2D, Camera camera, Size size);
 
-// Edge clipping
+// Edge clip_PIng
 bool edgeClip(vector <Point2f> &edgePxl, Size size);
 
 // Check if a surface is visible from the camera's viewpoint
@@ -85,9 +82,9 @@ Camera createCam(Vec3f t, Vec3f r, float fov, int width, int height, vector <Sta
 void resetVisibility(Cuboid3D &cuboid3D);
 
 // Display image plane
-void dispImagePlane(string windowName, Mat imagePlane);
+void dis_PImagePlane(string windowName, Mat imagePlane);
 
-// Convert 3D vertices and parameters values to Mat, states to enum Parameters and extract intrisincs matrix 
+// Convert 3D _VERTICES and parameters values to Mat, states to enum Parameters and extract intrisincs matrix 
 void extractDataForDerivatives(Cuboid3D model, Cuboid2D modelProjection, Camera virtualCam, Mat &V, Mat &Vph, Mat &K, Mat &x, vector <Parameter> &xk);
 
 // Convert STL vector to OpenCV Mat
@@ -128,7 +125,7 @@ void distTransformImageGradient(Mat distTransform, Mat & dxdist, Mat & dydist);
 Mat computeModelFirstDerivatives(Cuboid3D model, Cuboid2D modelProjection, Camera virtualCam, Mat mijs, Mat distTransform);
 
 // Gauss - Newton non linear fitting
-vector<float> fittingGaussNewton(vector<float> params, vector<State> states, Mat Jdijs, Mat dijs);
+vector<float> fittingGaussNewton(Camera virtualCam, Mat Jdijs, Mat dijs);
 
 // Dimensions of inputs, are not equal
 template<typename T>

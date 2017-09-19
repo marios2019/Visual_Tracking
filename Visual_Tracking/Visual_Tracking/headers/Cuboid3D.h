@@ -6,9 +6,9 @@
 #include <iostream>
 #include <vector>
 
-#define VERTICES 8
-#define EDGES 12
-#define SURFACES 6
+#define _VERTICES 8
+#define _EDGES 12
+#define _SURFACES 6
 
 using namespace cv;
 using namespace std;
@@ -38,17 +38,17 @@ public:
 	Point3f getDimensions() const; // Returns the dimensions of the cuboid3d
 
 	Point3f getVertex(int idx); // Returns a vertex of the cuboid3d, in local coordinates
-	vector <Point3f> getVertices() const; // Returns a vector of cuboid3d vertices, in local coordinates
-	int getVerticesSize() const; // Returns the number of vertices
+	vector <Point3f> getVertices() const; // Returns a vector of cuboid3d _VERTICES, in local coordinates
+	int getVerticesSize() const; // Returns the number of _VERTICES
 	
 	vector <int> getEdge(int idx); // Returns an edge of the cuboid3d
 	vector <vector <int>> getEdges() const; // Returns a vector of cuboid3d edges
 	int getEdgesSize() const; // Returns the number of edges
 	
-	vector <int> getSurfaceVertices(int idx); // Returns a surface (with pointers to vertices) of the cuboid3d
-	vector <vector <int>> getSurfacesVertices() const; // Returns a vector of cuboid3d surfaces (with pointers to vertices)
+	vector <int> getSurfaceVertices(int idx); // Returns a surface (with pointers to _VERTICES) of the cuboid3d
+	vector <vector <int>> getSurfacesVertices() const; // Returns a vector of cuboid3d surfaces (with pointers to _VERTICES)
 	vector <int> getSurfaceEdges(int idx); // Returns a surface (with pointers to edges) of the cuboid3d
-	vector <vector <int>> getSurfacesEdges() const; // Returns a vector of cuboid3d surfaces (with pointers to vertices)
+	vector <vector <int>> getSurfacesEdges() const; // Returns a vector of cuboid3d surfaces (with pointers to _VERTICES)
 	int getSurfacesSize() const; // Returns the number of surfaces
 
 	void setEdgeVisibility(int idx, bool visible); // Change the edge visibility
@@ -64,7 +64,7 @@ public:
 	void setEdgesRendered(int edgeVal); // Set which edges will be rendered
 
 private:
-	vector <Point3f> vertices; // Vertices of the cuboid, in local coordinates
+	vector <Point3f> vertices; // _VERTICES of the cuboid, in local coordinates
 	vector <vector <int>> edges, surfacesVertices, surfacesEdges; // 12 edges and 6 surfaces of the cuboid
 	vector <bool> edgesVisibility, surfacesVisibility; // Check the visibility of edges and surfaces according to the camera
 	vector <bool> edgesRendered; // Define which edges are going to be rendered

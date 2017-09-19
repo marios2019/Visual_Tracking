@@ -2,8 +2,8 @@
 #include "../headers/visualTracking.h"
 
 // Image plane dimensions
-#define WIDTH 400
-#define HEIGHT 300
+#define _WIDTH 400
+#define _HEIGHT 300
 
 int main(int argc, char** argv)
 {
@@ -16,7 +16,7 @@ int main(int argc, char** argv)
 	// Data initialization
 	Cuboid3D Data(length, height, width);
 
-	visualTracker(model, Data, WIDTH, HEIGHT);
+	visualTracker(model, Data, _WIDTH, _HEIGHT);
 	
 	exit(EXIT_SUCCESS);
 }

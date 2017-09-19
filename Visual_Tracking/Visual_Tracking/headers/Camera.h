@@ -10,9 +10,9 @@
 
 #include "CameraStateSpace.h"
 
-#define PI 3.14159265f
-#define DEG 360.f
-#define Kp 500.f // Pixels quantity per metric unit
+#define _PI 3.14159265f
+#define _DEG 360.f
+#define _Kp 500.f // _PIxels quantity per metric unit
 
 using namespace cv;
 using namespace std;
@@ -22,7 +22,8 @@ enum Rotation { EULER, AXISANGLE };
 class Camera: public CameraStateSpace
 {
 public:
-	Camera::Camera(Vec3f tVal = Vec3f(), Vec3f rVal = Vec3f(), Point2f principalVal = Point2f(), float fovVal = 0.f, float focalPixelsVal = 0.f, vector <State> stateVal = { X, Y, Z, THETAX, THETAY, THETAZ }); // Constructor
+	Camera::Camera(Vec3f tVal = Vec3f(), Vec3f eulerAnglesVal = Vec3f(), Point2f principalVal = Point2f(), float fovVal = 0.f,
+		float focal_PIxelsVal = 0.f, vector <State> stateVal = { X, Y, Z, THETAX, THETAY, THETAZ }, Rotation RtypeVal = EULER); // Constructor
 	~Camera(); // Destructor
 
 	void setPrincipal(Point2f principalVal); // Change principal point
@@ -54,6 +55,7 @@ public:
 
 	void setParams(vector <float> paramsVal, vector <State> stateVal, Angle angle); // Set camera parameters
 	
+	Rotation getRotationType() const; // Get 3D rotation type
 private:
 	// Camera Intrinsics
 	Point2f principalPoint; // Principal point - center of image plane
@@ -61,6 +63,7 @@ private:
 	float focalPixels; // Focal length in pixel coordinates
 	float focalMetric; // Focal length in metric coordinates
 	int width; // Image plane width
+	Rotation Rtype; // 3D rotation represenation
 
 	float checkFocal(float focalVal); // Check if focal length has non negative value
 };

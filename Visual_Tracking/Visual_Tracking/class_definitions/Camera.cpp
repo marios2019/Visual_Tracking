@@ -1,15 +1,17 @@
 #include "..\headers\Camera.h"
 
-Camera::Camera(Vec3f tVal, Vec3f rVal, Point2f principalVal, float fovVal, float focalPixelsVal, vector <State> stateVal) // Constructor
-	: CameraStateSpace(tVal.val[0], tVal.val[1], tVal.val[2], rVal.val[0], rVal.val[1], rVal.val[2], stateVal)
+Camera::Camera(Vec3f tVal, Vec3f eulerAnglesVal, Point2f principalVal, float fovVal, float focal_PIxelsVal, vector <State> stateVal, Rotation RtypeVal) // Constructor
+	: CameraStateSpace(tVal.val[0], tVal.val[1], tVal.val[2], eulerAnglesVal.val[0], eulerAnglesVal.val[1], eulerAnglesVal.val[2], stateVal)
 {
 	// Intrinsics initialization
 	principalPoint = principalVal;
-	fov = fmod(fmod(fovVal, DEG) + DEG, DEG);
-	focalPixels = checkFocal(focalPixelsVal);
-	focalMetric = focalPixelsVal / Kp;
-	width = static_cast<int>(2.f * focalPixelsVal * tan(deg2rad(fovVal / 2.f)));
+	fov = fmod(fmod(fovVal, _DEG) + _DEG, _DEG);
+	focalPixels = checkFocal(focal_PIxelsVal);
+	focalMetric = focal_PIxelsVal / _Kp;
+	width = static_cast<int>(2.f * focal_PIxelsVal * tan(deg2rad(fovVal / 2.f)));
+	Rtype = RtypeVal;
 }
+
 
 Camera::~Camera()
 {
@@ -32,7 +34,7 @@ void Camera::setFov(float fovVal)
 {
 	fov = fmod(fmod(fovVal, DEG) + DEG, DEG);
 	focalPixels = static_cast<float>(width) / (2.f * tan(deg2rad(fov / 2.f)));
-	focalMetric = focalPixels / Kp;
+	focalMetric = focalPixels / _Kp;
 }
 
 // Return fov
@@ -45,7 +47,7 @@ float Camera::getFov() const
 void Camera::setFocalPixels(float focalPixelsVal)
 {
 	focalPixels = checkFocal(focalPixelsVal);
-	focalMetric = focalPixels / Kp;
+	focalMetric = focalPixels / _Kp;
 	fov = 2.f * rad2deg(atan2f(static_cast<float>(width), 2.f * focalPixels));
 }
 
@@ -59,7 +61,7 @@ float Camera::getFocalPixels() const
 void Camera::setFocalMetric(float focalMetricVal)
 {
 	focalMetric = checkFocal(focalMetricVal);
-	focalPixels = Kp * focalMetric;
+	focalPixels = _Kp * focalMetric;
 	fov = 2.f * rad2deg(atan2f(static_cast<float>(width), 2.f * focalPixels));
 }
 
@@ -249,6 +251,12 @@ void Camera::setParams(vector <float> paramsVal, vector <State> stateVal, Angle 
 			break;
 		}
 	}
+}
+
+// Get 3D rotation type
+Rotation Camera::getRotationType() const
+{
+	return Rtype;
 }
 
 // Check if focal length has non negative value

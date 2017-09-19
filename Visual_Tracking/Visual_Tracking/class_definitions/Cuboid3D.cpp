@@ -5,15 +5,15 @@
 // Constructor
 Cuboid3D::Cuboid3D(float length, float height, float width)
 {
-	// Vertices initialization
+	// _VERTICES initialization
 	Point3f vertex;
-	for (int i = 0; i < VERTICES; i++)
+	for (int i = 0; i < _VERTICES; i++)
 	{
 			vertex = Point3f(((i % 4 != 0) && (i % 4 != 3) ? length : 0.f), (i % 4 >= 2 ? height : 0.f), (i >= 4 ? width : 0.f));
 			vertices.push_back(vertex);
 	}
 
-	// Edges initialization
+	// _EDGES initialization
 	edges.push_back({ 0, 1 }); // 0
 	edges.push_back({ 1, 2 }); // 1
 	edges.push_back({ 2, 3 }); // 2
@@ -27,7 +27,7 @@ Cuboid3D::Cuboid3D(float length, float height, float width)
 	edges.push_back({ 6, 2 }); // 10
 	edges.push_back({ 7, 3 }); // 11
 	
-	// Surfaces initialization
+	// _SURFACES initialization
 	surfacesVertices.push_back({ 1, 0, 3, 2 }); // 0
 	surfacesVertices.push_back({ 0, 4, 7, 3 }); // 1
 	surfacesVertices.push_back({ 4, 5, 6, 7 }); // 2
@@ -42,14 +42,14 @@ Cuboid3D::Cuboid3D(float length, float height, float width)
 	surfacesEdges.push_back({ 0, 9, 4, 8 }); // 5
 
 	// EdgesVisibility initializagtion
-	for (int i = 0; i < EDGES; i++)
+	for (int i = 0; i < _EDGES; i++)
 	{
 		edgesVisibility.push_back(false);
 		edgesRendered.push_back(true);
 	}
 
 	// SurfacesVisibility initializagtion
-	for (int i = 0; i < SURFACES; i++)
+	for (int i = 0; i < _SURFACES; i++)
 	{
 		surfacesVisibility.push_back(false);
 	}
@@ -71,9 +71,9 @@ void Cuboid3D::setLength(float length)
 	}
 
 	// Change the x-axis value to match the new length
-	for (int i = 0; i < VERTICES; i++)
+	for (int i = 0; i < _VERTICES; i++)
 	{
-		// Check which vertices must change their x value
+		// Check which _VERTICES must change their x value
 		vertices[i].x = ((i % 4 != 0) && (i % 4 != 3) ? length : 0.f);
 	}
 }
@@ -95,9 +95,9 @@ void Cuboid3D::setHeight(float height)
 	}
 
 	// Change the y-axis value to match the new height
-	for (int i = 0; i < VERTICES; i++)
+	for (int i = 0; i < _VERTICES; i++)
 	{
-		// Check which vertices must change their y value
+		// Check which _VERTICES must change their y value
 		vertices[i].y = (i % 4 >= 2 ? height : 0.f);
 	}
 }
@@ -119,7 +119,7 @@ void Cuboid3D::setWidth(float width)
 	}
 
 	// Change the z-axis value to match the new width
-	for (int i = 4; i < VERTICES; i++)
+	for (int i = 4; i < _VERTICES; i++)
 	{
 		vertices[i].z = width;
 	}
@@ -149,85 +149,85 @@ Point3f Cuboid3D::getDimensions() const
 // Returns a vertex of the Cuboid3D, in local coordinates
 Point3f Cuboid3D::getVertex(int idx)
 {
-	// Check if idx is between 0..VERTICES=8
-	checkIdx("Cuboid3D::vertices", idx, VERTICES);
+	// Check if idx is between 0.._VERTICES=8
+	checkIdx("Cuboid3D::_VERTICES", idx, _VERTICES);
 
 	return vertices[idx];
 }
 
-// Returns a vector of Cuboid3D vertices, in local coordinates
+// Returns a vector of Cuboid3D _VERTICES, in local coordinates
 vector <Point3f> Cuboid3D::getVertices() const
 {
 	return vertices;
 }
 
-// Returns the number of vertices
+// Returns the number of _VERTICES
 int Cuboid3D::getVerticesSize() const
 {
-	return VERTICES;
+	return _VERTICES;
 }
 
 // Returns an edge of the Cuboid3D
 vector <int> Cuboid3D::getEdge(int idx)
 {
-	// Check if idx is between 0..EDGES=12
-	checkIdx("Cuboid3D::edges", idx, EDGES);
+	// Check if idx is between 0.._EDGES=12
+	checkIdx("Cuboid3D::_EDGES", idx, _EDGES);
 
 	return edges[idx];
 }
 
-// Returns a vector of Cuboid3D edges
+// Returns a vector of Cuboid3D _EDGES
 vector <vector <int>> Cuboid3D::getEdges() const
 {
 	return edges;
 }
 
-// Returns the number of edges
+// Returns the number of _EDGES
 int Cuboid3D::getEdgesSize() const
 {
-	return EDGES;
+	return _EDGES;
 }
 
-// Returns a surface of the Cuboid3D (with pointers to vertices)
+// Returns a surface of the Cuboid3D (with pointers to _VERTICES)
 vector <int> Cuboid3D::getSurfaceVertices(int idx)
 {
-	// Check if idx is between 0..SURFACES=6
-	checkIdx("Cuboid3D::surfacesVertices", idx, SURFACES);
+	// Check if idx is between 0.._SURFACES=6
+	checkIdx("Cuboid3D::surfacesVertices", idx, _SURFACES);
 
 	return surfacesVertices[idx];
 }
 
-// Returns a vector of Cuboid3D surfaces (with pointers to vertices)
+// Returns a vector of Cuboid3D _SURFACES (with pointers to _VERTICES)
 vector <vector <int>> Cuboid3D::getSurfacesVertices() const
 {
 	return surfacesVertices;
 }
 
-// Returns a surface (with pointers to edges) of the cuboid3d
+// Returns a surface (with pointers to _EDGES) of the cuboid3d
 vector <int> Cuboid3D::getSurfaceEdges(int idx)
 {
-	// Check if idx is between 0..SURFACES=6
-	checkIdx("Cuboid3D::surfacesEdges", idx, SURFACES);
+	// Check if idx is between 0.._SURFACES=6
+	checkIdx("Cuboid3D::surfacesEdges", idx, _SURFACES);
 
 	return surfacesEdges[idx];
 }
 
-// Returns a vector of cuboid3d surfaces (with pointers to vertices)
+// Returns a vector of cuboid3d _SURFACES (with pointers to _VERTICES)
 vector <vector <int>> Cuboid3D::getSurfacesEdges() const
 {
 	return surfacesEdges;
 }
 
-// Returns the number of surfaces
+// Returns the number of _SURFACES
 int Cuboid3D::getSurfacesSize() const
 {
-	return SURFACES;
+	return _SURFACES;
 }
 
 // Change the edge visibility
 void Cuboid3D::setEdgeVisibility(int idx, bool visible)
 {
-	if ((idx < 0) || (idx >= EDGES))
+	if ((idx < 0) || (idx >= _EDGES))
 	{
 		cout << "Invalid memory access." << endl;
 		return;
@@ -245,13 +245,13 @@ void Cuboid3D::setEdgeVisibility(int idx, bool visible)
 
 bool Cuboid3D::getEdgeVisibility(int idx)
 {
-	// Check if idx is between 0..EDGES=12
-	checkIdx("Cuboid3D::edgesVisibility", idx, EDGES);
+	// Check if idx is between 0.._EDGES=12
+	checkIdx("Cuboid3D::edgesVisibility", idx, _EDGES);
 
 	return edgesVisibility[idx];
 }
 
-// Returns the vector of edges visibility
+// Returns the vector of _EDGES visibility
 vector <bool> Cuboid3D::getEdgesVisibility() const
 {
 	return edgesVisibility;
@@ -260,14 +260,14 @@ vector <bool> Cuboid3D::getEdgesVisibility() const
 // Change the surface visibility
 void Cuboid3D::setSurfaceVisibility(int idx, bool visible)
 {
-	if ((idx < 0) || (idx >= SURFACES))
+	if ((idx < 0) || (idx >= _SURFACES))
 	{
 		cout << "Invalid memory access." << endl;
 		return;
 	}
 
 	surfacesVisibility[idx] = visible;
-	// Set surface's edges to visibility = visible
+	// Set surface's _EDGES to visibility = visible
 	vector <int> surface = surfacesEdges[idx];
 	for (int i = 0; i < surface.size(); i++)
 	{
@@ -278,13 +278,13 @@ void Cuboid3D::setSurfaceVisibility(int idx, bool visible)
 // Returns the surface visibility
 bool Cuboid3D::getSurfaceVisibility(int idx)
 {
-	// Check if idx is between 0..SURFACES=6
-	checkIdx("Cuboid3D::surfacesVisibility", idx, SURFACES);
+	// Check if idx is between 0.._SURFACES=6
+	checkIdx("Cuboid3D::surfacesVisibility", idx, _SURFACES);
 
 	return surfacesVisibility[idx];
 }
 
-// Returns the vector of surfaces visibility
+// Returns the vector of _SURFACES visibility
 vector <bool> Cuboid3D::getSurfacesVisibility() const
 {
 	return surfacesVisibility;
@@ -301,22 +301,22 @@ void Cuboid3D::setEdgesRendered(bool render)
 	}
 
 	// Update edgesRendered vector
-	for (int i = 0; i < EDGES; i++)
+	for (int i = 0; i < _EDGES; i++)
 	{
 		edgesRendered[i] = render;
 	}
 }
 
-// Set which edges will be rendered
+// Set which _EDGES will be rendered
 void Cuboid3D::setEdgesRendered(int edgeVal)
 {
-	// Set all edges to be rendered to false
-	for (int i = 0; i < EDGES; i++)
+	// Set all _EDGES to be rendered to false
+	for (int i = 0; i < _EDGES; i++)
 	{
 			edgesRendered[i] = false;
 	}
 
-	if ((edgeVal >= 0) && (edgeVal < EDGES)) // Choose which edge is going to be rendered
+	if ((edgeVal >= 0) && (edgeVal < _EDGES)) // Choose which edge is going to be rendered
 	{
 		edgesRendered[edgeVal] = true;
 	}

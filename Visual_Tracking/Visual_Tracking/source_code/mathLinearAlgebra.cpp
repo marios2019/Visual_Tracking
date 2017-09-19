@@ -109,7 +109,6 @@ void cameraPose(Mat R, Mat t, Mat &E)
 	E.push_back(row);
 }
 
-
 // Perspective projection
 Point3f perspectiveProjection(Point3f point, Mat P)
 {
@@ -172,11 +171,11 @@ Mat jacobianPerspectiveProjection(Mat V, Mat K, Mat x, vector <Parameter> xk)
 	return Jvph;
 }
 
-// Compute the Jacobian matrix of the pixel coordinates
+// Compute the Jacobian matrix of the _PIxel coordinates
 // Inputs: matrix Vph = { 3D homogeneours projection points }
 //		   matrix Jvh = { first derivatives of projection homogeneous coordinates }
-// Output: matrix Jvp = { first derivatives of pixel coordinates }
-Mat jacobianPixelCoordinates(Mat Vph, Mat Jvph)
+// Output: matrix Jvp = { first derivatives of _PIxel coordinates }
+Mat jacobian_PIxelCoordinates(Mat Vph, Mat Jvph)
 {
 	Mat Jvp(Jvph.rows, Jvph.cols, CV_32FC2);
 
@@ -198,7 +197,7 @@ Mat jacobianPixelCoordinates(Mat Vph, Mat Jvph)
 			// Extract one homogeneous projection vertex derivative from Jvh at a time
 			Vec3f dvph = Jvph.at<Vec3f>(i, j);
 
-			// Pixel coordinate first derivative
+			// _PIxel coordinate first derivative
 			Vec2f dvp;
 			dvp.val[0] = (dvph.val[0] * vph.val[2] - vph.val[0] * dvph.val[2]) / powf(vph.val[2], 2.f);
 			dvp.val[1] = (dvph.val[1] * vph.val[2] - vph.val[1] * dvph.val[2]) / powf(vph.val[2], 2.f);
@@ -211,7 +210,7 @@ Mat jacobianPixelCoordinates(Mat Vph, Mat Jvph)
 
 // Compute the Jacobian matrix of the 2D edges
 // Inputs: matrix Jvp = { 2D projection points first derivatives}
-//		   vector edges2DPtr = { pointers to 2D projection vertices }
+//		   vector edges2DPtr = { pointers to 2D projection _VERTICES }
 // Output: matrix Jep = { first derivatives of 2D edges }
 Mat jacobianEdges(Mat Jvp, vector <vector <int>> edges2DPtr)
 {
@@ -224,7 +223,7 @@ Mat jacobianEdges(Mat Jvp, vector <vector <int>> edges2DPtr)
 
 		for (int j = 0; j < Jep.cols; j++)
 		{
-			// Extract the vertices of the edge
+			// Extract the _VERTICES of the edge
 			Vec2f dvp1 = Jvp.at<Vec2f>(edge2DPtr[0], j), dvp2 = Jvp.at<Vec2f>(edge2DPtr[1], j);
 
 			// Edge first derivative
@@ -301,7 +300,12 @@ Mat cameraPoseFirstDerivative(Mat x, Parameter xk)
 		t.push_back(x.row(i));
 	}
 	// Camera rotation matrix
+#ifdef _EULER
 	Mat R = eulerAngles2Matrix(x.at<float>(3, 0), x.at<float>(4, 0), x.at<float>(5, 0));
+#endif
+#ifdef _AXISANGLE
+	Mat R = axisAngle2Matrix(euler2AxisAngle(x.at<float>(3, 0), x.at<float>(4, 0), x.at<float>(5, 0)));
+#endif
 
 	// Camera's position vector and rotation matrix first derivatives
 	Mat dt = cameraPositionFirstDerivative(xk);
@@ -337,6 +341,7 @@ Mat cameraPositionFirstDerivative(Parameter xk)
 	}
 }
 
+#ifdef _EULER
 // Return camera rotation matrix first derivative in respect of the state parameters
 Mat cameraRotationFirstDerivative(Parameter xk, Mat x)
 {
@@ -388,6 +393,7 @@ Mat rotationFirstDerivative(Parameter xk, float theta)
 			return Mat();
 	}
 }
+#endif
 
 // Computer the first derivative of the inverse of 3D rotation matrix
 Mat inverseRotationMatrixDerivative(Mat R, Mat dR)
@@ -407,6 +413,9 @@ Mat inverseRotationMatrixDerivative(Mat R, Mat dR)
 
 	return -R.t() * dR * R.t();
 }
+
+
+
 
 // Image gradient to one direction
 Mat imageGradient(Mat Img, PartialDeriv partial)
@@ -458,4 +467,103 @@ Mat imageGradient(Mat Img, PartialDeriv partial)
 	}
 
 	return dImg;
+}
+
+#ifdef _AXISANGLE
+// Return camera rotation matrix first derivative in respect of the state parameters
+Mat cameraRotationFirstDerivative(Parameter xk, Mat x)
+{
+	int parameter = static_cast<int>(xk);
+	checkIdx("State parameters", parameter, 6);
+
+	float thetaX = deg2rad(x.at<float>(3, 0)), thetaY = deg2rad(x.at<float>(4, 0)), thetaZ = deg2rad(x.at<float>(5, 0));
+	Vec4f axisAngle = euler2AxisAngle(thetaX, thetaY, thetaZ);
+	float rx = axisAngle[0], ry = axisAngle[1], rz = axisAngle[2];
+	Vec3f axis(rx, ry, rz);
+	axis *= axisAngle[3];
+	Mat R = axisAngle2Matrix(axisAngle);
+	Mat term1 = axisAngleFirstDerivative_term1(axis, static_cast<AxisParameter>(parameter));
+	Mat term2 = axisAngleFirstDerivative_term2(axisAngle, static_cast<AxisParameter>(parameter));
+	return  R * (term1 + term2) / norm2(axis);
+}
+
+// Axis angle rotation matrix partial derivative - first term
+Mat axisAngleFirstDerivative_term1(Vec3f axis, AxisParameter parameter)
+{
+	float ri;
+	switch (parameter) // Choose parameter
+	{
+		case R1:
+		{
+			ri = axis.val[0];
+			break;
+		}
+		case R2:
+		{
+			ri = axis.val[1];
+			break;
+		}
+		case R3:
+		{
+			ri = axis.val[2];
+			break;
+		}
+		default:
+		{
+			ri = 0.f;
+			break;
+		}
+	}
+	
+	return (skewMat(axis) * ri); // First term construction
+}
+
+// Axis angle rotation matrix partial derivative - second term
+Mat axisAngleFirstDerivative_term2(Vec4f axisAngle, AxisParameter parameter)
+{
+	Vec3f axis(axisAngle.val[0], axisAngle.val[1], axisAngle.val[2]);
+	axis *= axisAngle.val[3];
+	Mat v(axis);
+	Mat R = axisAngle2Matrix(axisAngle);
+	Mat I = Mat::eye(3, 3, CV_32F);
+	Mat ei;
+
+	switch (parameter) // Choose i-th basis vector of R^3
+	{
+		case R1:
+		{
+			ei = (Mat_<float>(3, 1) << 1.f, 0.f, 0.f);
+			break;
+		}
+		case R2:
+		{
+			ei = (Mat_<float>(3, 1) << 0.f, 1.f, 0.f);
+			break;
+		}
+		case R3:
+		{
+			ei = (Mat_<float>(3, 1) << 0.f, 0.f, 1.f);
+			break;
+		}
+		default:
+		{
+			ei = (Mat_<float>(3, 1) << 0.f, 0.f, 0.f);
+			break;
+		}
+	}
+
+	return v * ((I - R) * ei).t();
+}
+#endif
+
+// Get 3D rotation representation type
+int rotation3Dtype()
+{
+#ifdef _EULER
+	return 0;
+#endif
+
+#ifdef _AXISANGLE
+	return 1;
+#endif
 }

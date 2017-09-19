@@ -13,7 +13,16 @@
 #include <algorithm>
 #include <cmath> 
 
-#define PI 3.14159265f
+#define _PI 3.14159265f
+#define _EULER
+
+#ifndef _EULER
+#define _AXISANGLE
+enum AxisParameter { R1 = 3, R2, R3};
+#endif
+
+// Parameters of the D(x) distance function 
+enum Parameter { X0, X1, X2, X3, X4, X5 };
 
 enum PartialDeriv { Dx, Dy };
 
@@ -59,8 +68,6 @@ bool checkMatrixSize(Size size, int rows, int cols);
 
 // Vector calculus
 
-// Parameters of the D(x) distance function 
-enum Parameter { X0, X1, X2, X3, X4, X5 };
 
 // Compute the Jacobian matrix of the perspective projection process
 // in respect to the parameters xk. 
@@ -71,15 +78,15 @@ enum Parameter { X0, X1, X2, X3, X4, X5 };
 // Output: matrix Jvh = { Jacobian matrix with the 3D projection homogeneous points }
 Mat jacobianPerspectiveProjection(Mat V, Mat K, Mat x, vector <Parameter> xk);
 
-// Compute the Jacobian matrix of the pixel coordinates
+// Compute the Jacobian matrix of the _PIxel coordinates
 // Inputs: matrix Vph = { 3D homogeneours projection points }
 //		   matrix Jvh = { first derivatives of projection homogeneous coordinates }
-// Output: matrix Jvp = { first derivatives of pixel coordinates }
-Mat jacobianPixelCoordinates(Mat Vph, Mat Jvh);
+// Output: matrix Jvp = { first derivatives of _PIxel coordinates }
+Mat jacobian_PIxelCoordinates(Mat Vph, Mat Jvh);
 
 // Compute the Jacobian matrix of the 2D edges
 // Inputs: matrix Jvp = { 2D projection points first derivatives}
-//		   vector edges2DPtr = { pointers to 2D projection vertices }
+//		   vector edges2DPtr = { pointers to 2D projection _VERTICES }
 // Output: matrix Jep = { first derivatives of 2D edges }
 Mat jacobianEdges(Mat Jvp, vector <vector <int>> edges2DPtr);
 
@@ -106,3 +113,14 @@ Mat inverseRotationMatrixDerivative(Mat R, Mat dR);
 
 // Image gradient to one direction
 Mat imageGradient(Mat Img, PartialDeriv partial);
+
+#ifdef _AXISANGLE
+// Axis angle rotation matrix partial derivative - first term
+Mat axisAngleFirstDerivative_term1(Vec3f axis, AxisParameter parameter);
+
+// Axis angle rotation matrix partial derivative - second term
+Mat axisAngleFirstDerivative_term2(Vec4f axisAngle, AxisParameter parameter);
+#endif
+
+// Get 3D rotation representation type
+int rotation3Dtype();
