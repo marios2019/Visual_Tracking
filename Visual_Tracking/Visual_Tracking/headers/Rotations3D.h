@@ -19,31 +19,31 @@ using namespace std;
 #define PI 3.14159265f
 
 // Euler angles
-// Return x-axis rotation matrix
+// Return x-axis rotation matrix, input angle expressed in radians
 template <typename T> Mat rotationX(T thetaX)
 {
 	return (Mat_<T>(3, 3) << 1, 0, 0, 0, cos(thetaX), -sin(thetaX), 0, sin(thetaX), cos(thetaX));
 }
 
-// Return y-axis rotation matrix
+// Return y-axis rotation matrix, input angle expressed in radians
 template <typename T> Mat rotationY(T thetaY)
 {
 	return (Mat_<T>(3, 3) << cos(thetaY), 0, sin(thetaY), 0, 1, 0, -sin(thetaY), 0, cos(thetaY));
 }
 
-// Return z-axis rotation matrix
+// Return z-axis rotation matrix, input angle expressed in radians
 template <typename T> Mat rotationZ(T thetaZ)
 {
 	return (Mat_<T>(3, 3) << cos(thetaZ), -sin(thetaZ), 0, sin(thetaZ), cos(thetaZ), 0, 0, 0, 1);
 }
 
-// Return rotation matrix according to Euler angles
+// Return rotation matrix according to Euler angles, angles expressed in radians
 template <typename T> Mat eulerAngles2Matrix(T thetaX, T thetaY, T thetaZ)
 {
-	return  rotationY(deg2rad(thetaY)) * rotationZ(deg2rad(thetaZ)) * rotationX(deg2rad(thetaX));
+	return  rotationY(thetaY) * rotationZ(thetaZ) * rotationX(thetaX);
 }
 
-// Return Euler angles from rotation matrix, expressed in degrees
+// Return Euler angles from rotation matrix, expressed in radians
 Vec3f matrix2euler(Mat R);
 
 // Degrees to radians
@@ -62,16 +62,29 @@ template <typename T> T rad2deg(T radians)
 bool IsRotationMatrix(Mat R);
 
 // Convert euler angles to axis angle
-// Input angles are in degrees
-// Output axis is multiplied by the rotation angle, expressed in degrees
-Vec4f euler2AxisAngle(float thetaX = 0.f, float thetaY = 0.f, float thetaZ = 0.f);
+// Input angles are in radians
+// Output axis is multiplied by the rotation angle, expressed in radians
+Vec3f euler2AxisAngle(float thetaX = 0.f, float thetaY = 0.f, float thetaZ = 0.f);
 
 // Axis angle to euler angle
-// Input axis is multiplied by the rotation angle, expressed in degrees
-Mat axisAngle2euler(Vec4f axisAngle = Vec4f());
+// Input axis is multiplied by the rotation angle, expressed in radians
+// Output euler angles are expressed in radians
+Vec3f axisAngle2euler(Vec3f axis = Vec3f());
 
 // Calculate rotation matrix from axis r which is multiplied
-// by angle expressed in degrees, using Rodrigues's formula
-Mat axisAngle2Matrix(Vec4f axisAngle = Vec4f());
+// by angle expressed in radians, using Rodrigues's formula
+Mat axisAngle2Matrix(Vec3f axis = Vec3f());
 
-Vec4f matrix2AxisAngle(Mat R = Mat::eye(3, 3, CV_32F));
+// Convert rotation matrix to axis angle representation,
+// where the output axis is multiplied by the rotation
+// angle, expressed in radian
+Vec3f matrix2AxisAngle(Mat R = Mat::eye(3, 3, CV_32F));
+
+// Vec4f axis angle to Vec3f axis angle, 
+// where the output axis angle is multiplied by the angle in radians
+Vec3f axisAngleConversion(Vec4f axisAngle);
+
+
+// Vec3f axis angle to Vec4f axis angle, 
+// where the output axis angle is divided by the angle in radians
+Vec4f axisAngleConversion(Vec3f axisAngle);

@@ -9,9 +9,22 @@ CameraStateSpace::CameraStateSpace(float tXVal, float tYVal, float tZVal, float 
 	tX = tXVal;
 	tY = tYVal;
 	tZ = tZVal;
-	thetaX = fmod(thetaXVal, DEG) * PI / 180.f;
-	thetaY = fmod(thetaYVal, DEG) * PI / 180.f;
-	thetaZ = fmod(thetaZVal, DEG) * PI / 180.f;
+	Vec3f axisAngle = euler2AxisAngle(thetaXVal, thetaYVal, thetaZVal);
+	// Check if the axis angle is corresponds to a rotation matrix
+	if (IsRotationMatrix(axisAngle2Matrix(axisAngle)))
+	{
+		r1 = axisAngle.val[0];
+		r2 = axisAngle.val[1];
+		r3 = axisAngle.val[2];
+	}
+	else
+	{
+		cout << "The input axis angle doesn't correspond to a rotation matrix: " << axisAngle << endl;
+		cout << "r1, r2, r3 are set to zero." << endl;
+		r1 = 0.f;
+		r2 = 0.f;
+		r3 = 0.f;
+	}
 	checkStateSize(stateVal.size());
 	state = stateVal;
 	sort(state.begin(), state.end());
@@ -58,85 +71,134 @@ float CameraStateSpace::getTz() const
 	return tZ;
 }
 
+// Set r1, r2, r3, input is an axis angle representation,
+// where the axis is multiplied by the rotation angle, expressed in radians
+void CameraStateSpace::setAxisAngle(Vec3f axisAngle)
+{
+	// Check if the axis angle is corresponds to a rotation matrix
+	if (IsRotationMatrix(axisAngle2Matrix(axisAngle)))
+	{
+		r1 = axisAngle.val[0];
+		r2 = axisAngle.val[1];
+		r3 = axisAngle.val[2];
+	}
+	else
+	{
+		cout << "The input axis angle doesn't correspond to a rotation matrix: " << axisAngle << endl;
+		cout << "r1, r2, r3 are set to zero." << endl;
+		r1 = 0.f;
+		r2 = 0.f;
+		r3 = 0.f;
+	}
+}
+
+// Return r1, r2, r3 in axis angle representation,
+// where the axis is multiplied by the rotation angle, expressed in radians
+Vec3f CameraStateSpace::getAxisAngle() const
+{
+	return Vec3f(r1, r2, r3);
+}
+
 // Change x-axis rotation
-void CameraStateSpace::setThetaX(float thetaXVal, Angle angle)
+void CameraStateSpace::setThetaX(float thetaX, Angle angle)
 {
 	// Degrees
 	if (angle == DEGREES)
 	{
-		thetaX = deg2rad(fmod(thetaXVal, DEG));
-		return;
+		thetaX = deg2rad(fmod(thetaX, _DEG));
+	}
+	else if (angle == RADIANS)
+	{
+		// Radians
+		thetaX = fmod(thetaX, 2.f * _PI);
 	}
 
-	// Radians
-	thetaX = fmod(thetaXVal, 2.f * PI);
+	// Convert euler angles to axis angle
+	Vec3f axisAngle = euler2AxisAngle(thetaX, getThetaY(RADIANS), getThetaZ(RADIANS));
+	setAxisAngle(axisAngle);
 }
 
 // Change y-axis rotation
-void CameraStateSpace::setThetaY(float thetaYVal, Angle angle)
+void CameraStateSpace::setThetaY(float thetaY, Angle angle)
 {
 	// Degrees
 	if (angle == DEGREES)
 	{
-		thetaY = deg2rad(fmod(thetaYVal, DEG));
-		return;
+		thetaY = deg2rad(fmod(thetaY, _DEG));
+	}
+	else if (angle == RADIANS)
+	{
+		// Radians
+		thetaY = fmod(thetaY, 2.f * PI);
 	}
 
-	// Radians
-	thetaY = fmod(thetaYVal, 2.f * PI);
+	// Convert euler angles to axis angle
+	Vec3f axisAngle = euler2AxisAngle(getThetaX(RADIANS), thetaY, getThetaZ(RADIANS));
+	setAxisAngle(axisAngle);
 }
 
 // Change z-axis rotation
-void CameraStateSpace::setThetaZ(float thetaZVal, Angle angle)
+void CameraStateSpace::setThetaZ(float thetaZ, Angle angle)
 {
 	// Degrees
 	if (angle == DEGREES)
 	{
-		thetaZ = deg2rad(fmod(thetaZVal, DEG));
-		return;
+		thetaZ = deg2rad(fmod(thetaZ, _DEG));
+	}
+	else if (angle == RADIANS)
+	{
+		// Radians
+		thetaZ = fmod(thetaZ, 2.f * _PI);
 	}
 
-	// Radians
-	thetaZ = fmod(thetaZVal, 2.f * PI);
+	// Convert euler angles to axis angle
+	Vec3f axisAngle = euler2AxisAngle(getThetaX(RADIANS), getThetaY(RADIANS), thetaZ);
+	setAxisAngle(axisAngle);
 }
 
 // Return x-axis rotation
 float CameraStateSpace::getThetaX(Angle angle) const
 {
+	// Convert r1, r2, r3 to euler angles
+	Vec3f eulerAngles = axisAngle2euler(getAxisAngle());
 	// Degrees
 	if (angle == DEGREES)
 	{
-		return rad2deg(thetaX);
+		return rad2deg(eulerAngles.val[0]);
 	}
 
 	// Radians
-	return thetaX;
+	return eulerAngles.val[0];
 }
 
 // Return y-axis rotation
 float CameraStateSpace::getThetaY(Angle angle) const
 {
+	// Convert r1, r2, r3 to euler angles
+	Vec3f eulerAngles = axisAngle2euler(getAxisAngle());
 	// Degrees
 	if (angle == DEGREES)
 	{
-		return rad2deg(thetaY);
+		return rad2deg(eulerAngles.val[1]);
 	}
-	
+
 	// Radians
-	return thetaY;
+	return eulerAngles.val[1];
 }
 
 // Return z-axis rotation
 float CameraStateSpace::getThetaZ(Angle angle) const
 {
+	// Convert r1, r2, r3 to euler angles
+	Vec3f eulerAngles = axisAngle2euler(getAxisAngle());
 	// Degrees
 	if (angle == DEGREES)
 	{
-		return rad2deg(thetaZ);
+		return rad2deg(eulerAngles.val[2]);
 	}
 
 	// Radians
-	return thetaZ;
+	return eulerAngles.val[2];
 }
 
 // Get specific camera parameters values
@@ -160,14 +222,14 @@ vector <float> CameraStateSpace::getParams(vector <State> stateVal)
 			case Z:
 				params.push_back(getTz());
 				break;
-			case THETAX:
-				params.push_back(getThetaX(DEGREES));
+			case R1:
+				params.push_back(r1);
 				break;
-			case THETAY:
-				params.push_back(getThetaY(DEGREES));
+			case R2:
+				params.push_back(r2);
 				break;
-			case THETAZ:
-				params.push_back(getThetaZ(DEGREES));
+			case R3:
+				params.push_back(r3);
 				break;
 			default:
 				break;
@@ -185,7 +247,7 @@ vector <float> CameraStateSpace::getParams(vector <State> stateVal)
 // Get all camera parameters values
 vector <float> CameraStateSpace::getParams()
 {
-	return	{ getTx(), getTy(), getTz(), getThetaX(DEGREES), getThetaY(DEGREES), getThetaZ(DEGREES) };
+	return	{ getTx(), getTy(), getTz(), r1, r2, r3 };
 }
 
 // Enable state parameters

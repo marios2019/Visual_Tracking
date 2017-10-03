@@ -1,13 +1,13 @@
 ﻿  visualTracking.cpp
-d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\source_code\visualtracking.cpp(223): warning C4566: character represented by universal-character-name '\u03BC' cannot be represented in the current code page (1252)
-d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\source_code\visualtracking.cpp(223): warning C4566: character represented by universal-character-name '\u03B5' cannot be represented in the current code page (1252)
-d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\source_code\visualtracking.cpp(223): warning C4566: character represented by universal-character-name '\u03C0' cannot be represented in the current code page (1252)
-d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\source_code\visualtracking.cpp(473): warning C4566: character represented by universal-character-name '\u03BC' cannot be represented in the current code page (1252)
-d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\source_code\visualtracking.cpp(473): warning C4566: character represented by universal-character-name '\u03B5' cannot be represented in the current code page (1252)
-d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\source_code\visualtracking.cpp(473): warning C4566: character represented by universal-character-name '\u03C0' cannot be represented in the current code page (1252)
-d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\source_code\visualtracking.cpp(496): warning C4566: character represented by universal-character-name '\u03BC' cannot be represented in the current code page (1252)
-d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\source_code\visualtracking.cpp(496): warning C4566: character represented by universal-character-name '\u03B5' cannot be represented in the current code page (1252)
-d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\source_code\visualtracking.cpp(496): warning C4566: character represented by universal-character-name '\u03C0' cannot be represented in the current code page (1252)
+d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\source_code\visualtracking.cpp(257): warning C4566: character represented by universal-character-name '\u03BC' cannot be represented in the current code page (1252)
+d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\source_code\visualtracking.cpp(257): warning C4566: character represented by universal-character-name '\u03B5' cannot be represented in the current code page (1252)
+d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\source_code\visualtracking.cpp(257): warning C4566: character represented by universal-character-name '\u03C0' cannot be represented in the current code page (1252)
+d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\source_code\visualtracking.cpp(540): warning C4566: character represented by universal-character-name '\u03BC' cannot be represented in the current code page (1252)
+d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\source_code\visualtracking.cpp(540): warning C4566: character represented by universal-character-name '\u03B5' cannot be represented in the current code page (1252)
+d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\source_code\visualtracking.cpp(540): warning C4566: character represented by universal-character-name '\u03C0' cannot be represented in the current code page (1252)
+d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\source_code\visualtracking.cpp(563): warning C4566: character represented by universal-character-name '\u03BC' cannot be represented in the current code page (1252)
+d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\source_code\visualtracking.cpp(563): warning C4566: character represented by universal-character-name '\u03B5' cannot be represented in the current code page (1252)
+d:\megasync\μεπ\github repos\visual_tracking\visual_tracking\visual_tracking\source_code\visualtracking.cpp(563): warning C4566: character represented by universal-character-name '\u03C0' cannot be represented in the current code page (1252)
   rotations3D.cpp
   mathLinearAlgebra.cpp
   error.cpp

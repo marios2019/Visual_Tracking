@@ -26,9 +26,9 @@ using namespace std;
 // Number of mijs
 #define _MNUM 5
 
-//#define _IMSHOW
-//#define _COUNT_TIME
-#define _DEMO
+#define _COUNT_TIME
+//#define _LOG
+//#define _DEMO
 
 #ifdef _DEMO
 // Virtual Camera default extrinsics parameters
@@ -58,7 +58,7 @@ void modelData(float &length, float &height, float &width);
 Cuboid2D rendering(Cuboid3D &cuboid3D, Camera &camera, Mat &imagePlane, Mat &imagePlaneObj, string type);
 
 // Dissimilarity between data and model object
-void dissimilarity(Cuboid2D model, Mat &imagePlane, Mat dataImage, int mNum, Mat &mijs, Mat &dijs, Mat &distTransform);
+void dissimilarity(vector <vector <Point2f>> edgesVertices, Mat &imagePlane, Mat dataImage, Mat distTransform, int mNum, Mat &mijs, Mat &dijs);
 
 // Draw object on image planes
 void drawObj(Cuboid2D objProjection, Mat &imagePlane, Mat &imagePlaneObj, Vec3b colour, int lineType);
@@ -70,7 +70,10 @@ void visibilityCulling(Cuboid3D &cuboid3D, Cuboid2D &cuboid2D, Camera camera, Si
 bool edgeClip(vector <Point2f> &edgePxl, Size size);
 
 // Check if a surface is visible from the camera's viewpoint
-int backFaceCulling(vector <int> surface, vector <Point3f> vertices, Point3f t);
+bool backFaceCulling(vector <int> surface, vector <Point3f> vertices, Point3f t);
+
+// Front camera visibility
+bool frontCameraVisibilty(vector<int> surface, vector<Point3f> vertices, Camera camera);
 
 // Fixed time frame update
 Cuboid2D updateFrame(Camera &virtualCam, Camera &realCam, Cuboid3D &model, Cuboid3D &Data, Mat &imagePlane, Mat &imagePlaneModel, Mat &imagePlaneData, Mat &dataImg);
@@ -82,7 +85,7 @@ Camera createCam(Vec3f t, Vec3f r, float fov, int width, int height, vector <Sta
 void resetVisibility(Cuboid3D &cuboid3D);
 
 // Display image plane
-void dis_PImagePlane(string windowName, Mat imagePlane);
+void displayImagePlane(string windowName, Mat imagePlane);
 
 // Convert 3D _VERTICES and parameters values to Mat, states to enum Parameters and extract intrisincs matrix 
 void extractDataForDerivatives(Cuboid3D model, Cuboid2D modelProjection, Camera virtualCam, Mat &V, Mat &Vph, Mat &K, Mat &x, vector <Parameter> &xk);
@@ -122,7 +125,7 @@ Mat calculateDistance(Mat mijs, Mat distTransform);
 void distTransformImageGradient(Mat distTransform, Mat & dxdist, Mat & dydist);
 
 // Compute dijs first derivatives
-Mat computeModelFirstDerivatives(Cuboid3D model, Cuboid2D modelProjection, Camera virtualCam, Mat mijs, Mat distTransform);
+Mat computeModelFirstDerivatives(Cuboid3D model, Cuboid2D modelProjection, Camera virtualCam, Mat mijs, Mat dxDist, Mat dyDist);
 
 // Gauss - Newton non linear fitting
 vector<float> fittingGaussNewton(Camera virtualCam, Mat Jdijs, Mat dijs);
@@ -133,3 +136,5 @@ void errorSize(string input1, string input2, T size1, T size2, string filename, 
 
 // Demo
 bool demo(Camera & realCam);
+// Export fitting data
+void exportFittingData(Mat m, Mat x);

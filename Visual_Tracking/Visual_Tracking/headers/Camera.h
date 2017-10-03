@@ -10,8 +10,6 @@
 
 #include "CameraStateSpace.h"
 
-#define _PI 3.14159265f
-#define _DEG 360.f
 #define _Kp 500.f // _PIxels quantity per metric unit
 
 using namespace cv;
@@ -23,7 +21,7 @@ class Camera: public CameraStateSpace
 {
 public:
 	Camera::Camera(Vec3f tVal = Vec3f(), Vec3f eulerAnglesVal = Vec3f(), Point2f principalVal = Point2f(), float fovVal = 0.f,
-		float focal_PIxelsVal = 0.f, vector <State> stateVal = { X, Y, Z, THETAX, THETAY, THETAZ }, Rotation RtypeVal = EULER); // Constructor
+		float focalPixelsVal = 0.f, vector <State> stateVal = { X, Y, Z, R1, R2, R3 }, Rotation RtypeVal = EULER); // Constructor
 	~Camera(); // Destructor
 
 	void setPrincipal(Point2f principalVal); // Change principal point
@@ -48,12 +46,7 @@ public:
 	Mat getIntrinsics() const; // Return camera intrinsics matrix
 	Mat getExtrinsics(Rotation type); // Return camera extrinsics matrix
 	
-	Mat getLieAlgebraDerivative(int idx); // Return projection first derivative with respect of the i-th
-											// se(3) Lie algebra generator.
-
-	Mat getGenerator(int) const; // Get i-th se(3) Lie algebra generator
-
-	void setParams(vector <float> paramsVal, vector <State> stateVal, Angle angle); // Set camera parameters
+	void setParams(vector <float> paramsVal, vector <State> stateVal); // Set camera parameters
 	
 	Rotation getRotationType() const; // Get 3D rotation type
 private:

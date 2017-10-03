@@ -224,15 +224,15 @@ void keyboardHandler(Camera &virtualCam, Camera &realCam, Cuboid3D &model, Cuboi
 	case 13: // ENTER key pressed - start fitting
 	{
 		fitFlag = true;
-		updateFlag = true;
+		updateFlag = false;
 		break;
 	}
 	case 32: // SPACE key pressed - set camera to default extrinsic parameters
 	{
-		vector <State> defaultState = { X, Y, Z, THETAX, THETAY, THETAZ };
-		virtualCam.setParams({ defaultParams.begin(), defaultParams.end() - 1 }, defaultState, DEGREES);
+		vector <State> defaultState = { X, Y, Z, R1, R2, R3 };
+		virtualCam.setParams({ defaultParams.begin(), defaultParams.end() - 1 }, defaultState);
 		defaultParams[0] += 2.f;
-		realCam.setParams({ defaultParams.begin(), defaultParams.end() - 1 }, defaultState, DEGREES);
+		realCam.setParams({ defaultParams.begin(), defaultParams.end() - 1 }, defaultState);
 		updateFlag = true;
 		break;
 	}

@@ -38,7 +38,7 @@ Mat skewMat(Vec3f m)
 }
 
 // Decompose camera pose matrix
-void decomposeCameraPose(Mat E, Mat& R, Vec3f& t)
+void decomposeCameraPose(Mat E, Mat &R, Vec3f &t)
 {
 	// Check if matrix is 3 x 4
 	if (checkMatrixSize(E.size(), 3, 4))
@@ -47,26 +47,26 @@ void decomposeCameraPose(Mat E, Mat& R, Vec3f& t)
 	}
 	
 	// Extract 3D rotation matrix
-	Mat Rd = Mat(3, 3, CV_32F);
+	Mat Rtemp = Mat(3, 3, CV_32F);
 	Rect r(0, 0, 3, 3);
-	Rd = E(r).clone();
-	transpose(Rd, Rd);
-	if (!IsRotationMatrix(Rd))
+	Rtemp = E(r).clone();
+	transpose(Rtemp, Rtemp);
+	if (!IsRotationMatrix(Rtemp))
 	{
 		cout << "The input matrix doesn't contains a 3D rotation matrix at the upper left 3 x 3 region." << endl;
 		return;
 	}
-	Rd.copyTo(R);
+	Rtemp.copyTo(R);
 
 	// Extract position vector
-	Mat td;
+	Mat ttemp;
 	Vec3f Rt;
 	Rt.val[0] = E.at<float>(0, 3);
 	Rt.val[1] = E.at<float>(1, 3);
 	Rt.val[2] = E.at<float>(2, 3);
 	Rt = -Rt;
-	td = R * Mat(Rt);
-	t = td;
+	ttemp = R * Mat(Rt);
+	t = ttemp;
 }
 
 // Decompose euclidean transformation matrix expressed in homogeneous coordinates - matrix size 4 x 4
@@ -79,15 +79,15 @@ void decomposeEuclidean(Mat E, Mat &R, Vec3f &t)
 	}
 
 	// Extract 3D rotation matrix
-	Mat Rd = Mat(3, 3, CV_32F);
+	Mat Rtemp = Mat(3, 3, CV_32F);
 	Rect r(0, 0, 3, 3);
-	Rd = E(r).clone();
-	if (!IsRotationMatrix(Rd))
+	Rtemp = E(r).clone();
+	if (!IsRotationMatrix(Rtemp))
 	{
 		cout << "The input euclidean transformation matrix doesn't contains a 3D rotation matrix at the upper left 3 x 3 region." << endl;
 		return;
 	}
-	Rd.copyTo(R);
+	Rtemp.copyTo(R);
 
 	// Extract position vector
 	t.val[0] = E.at<float>(0, 3);
@@ -171,11 +171,11 @@ Mat jacobianPerspectiveProjection(Mat V, Mat K, Mat x, vector <Parameter> xk)
 	return Jvph;
 }
 
-// Compute the Jacobian matrix of the _PIxel coordinates
+// Compute the Jacobian matrix of the pixel coordinates
 // Inputs: matrix Vph = { 3D homogeneours projection points }
 //		   matrix Jvh = { first derivatives of projection homogeneous coordinates }
 // Output: matrix Jvp = { first derivatives of _PIxel coordinates }
-Mat jacobian_PIxelCoordinates(Mat Vph, Mat Jvph)
+Mat jacobianPixelCoordinates(Mat Vph, Mat Jvph)
 {
 	Mat Jvp(Jvph.rows, Jvph.cols, CV_32FC2);
 
@@ -301,10 +301,12 @@ Mat cameraPoseFirstDerivative(Mat x, Parameter xk)
 	}
 	// Camera rotation matrix
 #ifdef _EULER
-	Mat R = eulerAngles2Matrix(x.at<float>(3, 0), x.at<float>(4, 0), x.at<float>(5, 0));
+	Vec3f eulerAngles = axisAngle2euler(Vec3f(x.at<float>(3, 0), x.at<float>(4, 0), x.at<float>(5, 0)));
+	Mat R = eulerAngles2Matrix(eulerAngles.val[0], eulerAngles.val[1], eulerAngles.val[2]);
 #endif
 #ifdef _AXISANGLE
-	Mat R = axisAngle2Matrix(euler2AxisAngle(x.at<float>(3, 0), x.at<float>(4, 0), x.at<float>(5, 0)));
+	Vec3f axisAngle(x.at<float>(3, 0), x.at<float>(4, 0), x.at<float>(5, 0));
+	Mat R = axisAngle2Matrix(axisAngle);
 #endif
 
 	// Camera's position vector and rotation matrix first derivatives
@@ -337,7 +339,10 @@ Mat cameraPositionFirstDerivative(Parameter xk)
 		case 5: // x = thetaz
 			return Mat::zeros(3, 1, CV_32F);
 		default:
+		{
+			cout << "Not valid state parameter." << endl;
 			return Mat();
+		}
 	}
 }
 
@@ -348,7 +353,8 @@ Mat cameraRotationFirstDerivative(Parameter xk, Mat x)
 	int parameter = static_cast<int>(xk);
 	checkIdx("State parameters", parameter, 6);
 
-	float thetaX = deg2rad(x.at<float>(3, 0)), thetaY = deg2rad(x.at<float>(4, 0)), thetaZ = deg2rad(x.at<float>(5, 0));
+	Vec3f eulerAngles = axisAngle2euler(Vec3f(x.at<float>(3, 0), x.at<float>(4, 0), x.at<float>(5, 0)));
+	float thetaX = eulerAngles.val[0], thetaY = eulerAngles.val[1], thetaZ = eulerAngles.val[2];
 
 	switch (parameter)
 	{
@@ -365,7 +371,10 @@ Mat cameraRotationFirstDerivative(Parameter xk, Mat x)
 		case 5: // x = thetaz
 			return rotationY(thetaY) * rotationFirstDerivative(xk, thetaZ) * rotationX(thetaX);
 		default:
+		{
+			cout << "Not valid state parameter." << endl;
 			return Mat();
+		}
 	}
 }
 
@@ -390,7 +399,10 @@ Mat rotationFirstDerivative(Parameter xk, float theta)
 		case 5: // x = thetaz
 			return (Mat_<float>(3, 3) << -sin(theta), -cos(theta), 0, cos(theta), -sin(theta), 0, 0, 0, 0);
 		default:
+		{
+			cout << "Not valid state parameter." << endl;
 			return Mat();
+		}
 	}
 }
 #endif
@@ -413,9 +425,6 @@ Mat inverseRotationMatrixDerivative(Mat R, Mat dR)
 
 	return -R.t() * dR * R.t();
 }
-
-
-
 
 // Image gradient to one direction
 Mat imageGradient(Mat Img, PartialDeriv partial)
@@ -476,85 +485,191 @@ Mat cameraRotationFirstDerivative(Parameter xk, Mat x)
 	int parameter = static_cast<int>(xk);
 	checkIdx("State parameters", parameter, 6);
 
-	float thetaX = deg2rad(x.at<float>(3, 0)), thetaY = deg2rad(x.at<float>(4, 0)), thetaZ = deg2rad(x.at<float>(5, 0));
-	Vec4f axisAngle = euler2AxisAngle(thetaX, thetaY, thetaZ);
-	float rx = axisAngle[0], ry = axisAngle[1], rz = axisAngle[2];
-	Vec3f axis(rx, ry, rz);
-	axis *= axisAngle[3];
-	Mat R = axisAngle2Matrix(axisAngle);
-	Mat term1 = axisAngleFirstDerivative_term1(axis, static_cast<AxisParameter>(parameter));
-	Mat term2 = axisAngleFirstDerivative_term2(axisAngle, static_cast<AxisParameter>(parameter));
-	return  R * (term1 + term2) / norm2(axis);
-}
+	Vec3f axisAngle(x.at<float>(3, 0), x.at<float>(4, 0), x.at<float>(5, 0));
 
-// Axis angle rotation matrix partial derivative - first term
-Mat axisAngleFirstDerivative_term1(Vec3f axis, AxisParameter parameter)
-{
-	float ri;
-	switch (parameter) // Choose parameter
+	switch (xk) // Choose parameter
 	{
-		case R1:
-		{
-			ri = axis.val[0];
-			break;
-		}
-		case R2:
-		{
-			ri = axis.val[1];
-			break;
-		}
-		case R3:
-		{
-			ri = axis.val[2];
-			break;
-		}
+		case X0: // x = tx
+			return Mat::zeros(3, 3, CV_32F);
+		case X1: // x = ty
+			return Mat::zeros(3, 3, CV_32F);
+		case X2: // x = tz
+			return Mat::zeros(3, 3, CV_32F);
+		case X3: // x = r1
+			return (axisAngleFirstDerivative_term1(axisAngle, xk) + axisAngleFirstDerivative_term2(axisAngle, xk));
+		case X4: // x = r2
+			return (axisAngleFirstDerivative_term1(axisAngle, xk) + axisAngleFirstDerivative_term2(axisAngle, xk));
+		case X5: // x = r3
+			return (axisAngleFirstDerivative_term1(axisAngle, xk) + axisAngleFirstDerivative_term2(axisAngle, xk));
 		default:
 		{
-			ri = 0.f;
-			break;
+			cout << "Not valid state parameter." << endl;
+			return Mat();
 		}
-	}
-	
-	return (skewMat(axis) * ri); // First term construction
+	}	
 }
 
-// Axis angle rotation matrix partial derivative - second term
-Mat axisAngleFirstDerivative_term2(Vec4f axisAngle, AxisParameter parameter)
+// Axis angle rotation matrix partial derivative - first term ([normalised(r)]x * sin(theta))
+Mat axisAngleFirstDerivative_term1(Vec3f axisAngle, Parameter xk)
 {
-	Vec3f axis(axisAngle.val[0], axisAngle.val[1], axisAngle.val[2]);
-	axis *= axisAngle.val[3];
-	Mat v(axis);
-	Mat R = axisAngle2Matrix(axisAngle);
-	Mat I = Mat::eye(3, 3, CV_32F);
-	Mat ei;
+	Vec4f axisNormalised = axisAngleConversion(axisAngle);
+	// Normalised axis skew symmetric matrix
+	Mat skew_r = skewMat(Vec3f(axisNormalised.val[0], axisNormalised.val[1], axisNormalised.val[2]));
+	// Normalised axis skew symmetric matrix first derivative
+	Mat Dskew_r;
+	// Rotation angle
+	float theta = axisNormalised.val[3], norm = theta;
+	// Norm first derivative
+	float dnorm;
+	// dsin(theta), where theta is a function of axisAngle
+	float dsin;
 
-	switch (parameter) // Choose i-th basis vector of R^3
+	if ((xk >= X3) && (xk <= X5))
 	{
-		case R1:
-		{
-			ei = (Mat_<float>(3, 1) << 1.f, 0.f, 0.f);
-			break;
-		}
-		case R2:
-		{
-			ei = (Mat_<float>(3, 1) << 0.f, 1.f, 0.f);
-			break;
-		}
-		case R3:
-		{
-			ei = (Mat_<float>(3, 1) << 0.f, 0.f, 1.f);
-			break;
-		}
-		default:
-		{
-			ei = (Mat_<float>(3, 1) << 0.f, 0.f, 0.f);
-			break;
-		}
+		Dskew_r = skewMatFirstDerivative(static_cast<int>(xk) - 3);
+		dnorm = normFirstDerivative(axisAngle, static_cast<int>(xk) - 3);
+		dsin = sinFirstDerivative(axisAngle, static_cast<int>(xk) - 3);
+	}
+	else
+	{
+		cout << "Not valid axis angle parameter." << endl;
+		return Mat();
 	}
 
-	return v * ((I - R) * ei).t();
+	// The derivative of the first term as state above is
+	// the derivative of the product of two subsequent terms
+	Mat Dproduct1 = sin(theta) * ((Dskew_r * norm - skewMat(axisAngle) * dnorm) / axisAngle.dot(axisAngle));
+	Mat Dproduct2 = skew_r * dsin;
+
+	return (Dproduct1 + Dproduct2); // First term construction
+}
+
+// Axis angle rotation matrix partial derivative - second term ([normalised(r)]x^2 * (1 - cos(theta)))
+Mat axisAngleFirstDerivative_term2(Vec3f axisAngle, Parameter xk)
+{
+	Vec4f axisNormalised = axisAngleConversion(axisAngle);
+	// Normalised axis skew symmetric matrix
+	Mat skew_r = skewMat(Vec3f(axisNormalised.val[0], axisNormalised.val[1], axisNormalised.val[2]));
+	// Normalised axis skew symmetric matrix first derivative
+	Mat Dskew_rSqrd; 
+	// Rotation angle
+	float theta = axisNormalised.val[3], norm = theta;
+	// Dot product derivative
+	float ddot;
+	// dcos(theta), where theta is a function of axisAngle
+	float dcos;
+
+	if ((xk >= X3) && (xk <= X5))
+	{
+		Dskew_rSqrd = skewMatSqrdFirstDerivative(axisAngle, static_cast<int>(xk) - 3);
+		ddot = dotProductFirstDerivative(axisAngle, static_cast<int>(xk) - 3);
+		dcos = cosFirstDerivative(axisAngle, static_cast<int>(xk) - 3);
+	}
+	else
+	{
+		cout << "Not valid axis angle parameter." << endl;
+		return Mat();
+	}
+
+	// The derivative of the second term as state above is
+	// the derivative of the product of two subsequent terms
+	float dot = axisAngle.dot(axisAngle);
+	Mat Dproduct1 = (1.f - cos(theta)) * ((Dskew_rSqrd * dot - skewMat(axisAngle) * skewMat(axisAngle) * ddot) / (dot * dot));
+	Mat Dproduct2 = skew_r * skew_r * (-dcos);
+
+	return (Dproduct1 + Dproduct2);
 }
 #endif
+
+// 3 x 3 skew symmetric matrix first derivative
+Mat skewMatFirstDerivative(int vi)
+{
+	switch (vi) // Choose one of three elements that are used to built the 3 x 3 skew symmetric matrix
+	{
+		case 0: // vi = v0
+			return (Mat_<float>(3, 3) << 0.f, 0.f, 0.f, 0.f, 0.f, -1.f, 0.f, 1.f, 0.f);
+		case 1: // vi = v1
+			return (Mat_<float>(3, 3) << 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, -1.f, 0.f, 0.f);
+		case 2: // vi = v2
+			return (Mat_<float>(3, 3) << 0.f, -1.f, 0.f, 1.f, 0.f, 0.f, 0.f, 0.f, 0.f);
+		default:
+		{
+			cout << "Not valid element." << endl;
+			return Mat();
+		}
+	}
+}
+
+// 3 x 3 skew symmetric matrix squared, first derivative
+Mat skewMatSqrdFirstDerivative(Vec3f v, int vi)
+{
+	switch (vi) // Choose one of three elements that are used to built the 3 x 3 skew symmetric matrix
+	{
+	case 0: // vi = v0
+		return (Mat_<float>(3, 3) << 0.f, v.val[1], v.val[2], v.val[1], -2.f*v.val[0], 0.f, v.val[2], 0.f, -2.f*v.val[0]);
+	case 1: // vi = v1
+		return (Mat_<float>(3, 3) << -2.f*v.val[1], v.val[0], 0.f, v.val[0], 0.f, v.val[2], 0.f, v.val[2], -2.f*v.val[1]);
+	case 2: // vi = v2
+		return (Mat_<float>(3, 3) << -2.f*v.val[2], 0.f, v.val[0], 0.f, -2.f*v.val[2], v.val[1], v.val[0], v.val[1], 0.f);
+	default:
+	{
+		cout << "Not valid element." << endl;
+		return Mat();
+	}
+	}
+}
+
+// First derivative of the euclidean norm of 3 x 1 vector
+float normFirstDerivative(Vec3f v, int vi)
+{
+	float norm = norm2(v);
+	// Dot product first derivative
+	float ddot = dotProductFirstDerivative(v, vi);
+	// Norm first derivative in respect to the dot product
+	float dnorm_dot = 1.f / (2.f * norm);
+
+	// Chain rule
+	return dnorm_dot * ddot;
+}
+
+// First derivative of the dot product v . v
+float dotProductFirstDerivative(Vec3f v, int vi)
+{
+	switch (vi) // Choose one of three elements of v
+	{
+		case 0: // vi = v0
+			return (2 * v.val[0]);
+		case 1: // vi = v1
+			return (2 * v.val[1]);
+		case 2: // vi = v2
+			return (2 * v.val[2]);
+		default:
+		{
+			cout << "Not valid element." << endl;
+			return 0.f;
+		}
+	}
+}
+
+// First derivative of sin(theta), where theta is a function of v
+float sinFirstDerivative(Vec3f v, int vi)
+{
+	float dnorm = normFirstDerivative(v, vi);
+	float theta = norm2(v);
+
+	// Chain rule
+	return cos(theta) * dnorm;
+}
+
+// First derivative of sin(theta), where theta is a function of v
+float cosFirstDerivative(Vec3f v, int vi)
+{
+	float dnorm = normFirstDerivative(v, vi);
+	float theta = norm2(v);
+
+	// Chain rule
+	return -sin(theta) * dnorm;
+}
 
 // Get 3D rotation representation type
 int rotation3Dtype()

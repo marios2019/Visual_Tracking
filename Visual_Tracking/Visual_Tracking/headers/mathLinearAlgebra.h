@@ -18,7 +18,6 @@
 
 #ifndef _EULER
 #define _AXISANGLE
-enum AxisParameter { R1 = 3, R2, R3};
 #endif
 
 // Parameters of the D(x) distance function 
@@ -78,11 +77,11 @@ bool checkMatrixSize(Size size, int rows, int cols);
 // Output: matrix Jvh = { Jacobian matrix with the 3D projection homogeneous points }
 Mat jacobianPerspectiveProjection(Mat V, Mat K, Mat x, vector <Parameter> xk);
 
-// Compute the Jacobian matrix of the _PIxel coordinates
+// Compute the Jacobian matrix of the pixel coordinates
 // Inputs: matrix Vph = { 3D homogeneours projection points }
 //		   matrix Jvh = { first derivatives of projection homogeneous coordinates }
 // Output: matrix Jvp = { first derivatives of _PIxel coordinates }
-Mat jacobian_PIxelCoordinates(Mat Vph, Mat Jvh);
+Mat jacobianPixelCoordinates(Mat Vph, Mat Jvh);
 
 // Compute the Jacobian matrix of the 2D edges
 // Inputs: matrix Jvp = { 2D projection points first derivatives}
@@ -115,12 +114,30 @@ Mat inverseRotationMatrixDerivative(Mat R, Mat dR);
 Mat imageGradient(Mat Img, PartialDeriv partial);
 
 #ifdef _AXISANGLE
-// Axis angle rotation matrix partial derivative - first term
-Mat axisAngleFirstDerivative_term1(Vec3f axis, AxisParameter parameter);
+// Axis angle rotation matrix partial derivative - first term ([normalised(r)]x * sin(theta))
+Mat axisAngleFirstDerivative_term1(Vec3f axisAngle, Parameter xk);
 
-// Axis angle rotation matrix partial derivative - second term
-Mat axisAngleFirstDerivative_term2(Vec4f axisAngle, AxisParameter parameter);
+// Axis angle rotation matrix partial derivative - second term ([normalised(r)]x^2 * (1 - cos(theta)))
+Mat axisAngleFirstDerivative_term2(Vec3f axisAngle, Parameter xk);
 #endif
+
+// 3 x 3 skew symmetric matrix first derivative
+Mat skewMatFirstDerivative(int vi);
+
+// 3 x 3 skew symmetric matrix squared, first derivative
+Mat skewMatSqrdFirstDerivative(Vec3f v, int vi);
+
+// First derivative of the euclidean norm of 3 x 1 vector
+float normFirstDerivative(Vec3f v, int vi);
+
+// First derivative of the dot product v . v
+float dotProductFirstDerivative(Vec3f v, int vi);
+
+// First derivative of sin(theta), where theta is a function of v
+float sinFirstDerivative(Vec3f v, int vi);
+
+// First derivative of sin(theta), where theta is a function of v
+float cosFirstDerivative(Vec3f v, int vi);
 
 // Get 3D rotation representation type
 int rotation3Dtype();

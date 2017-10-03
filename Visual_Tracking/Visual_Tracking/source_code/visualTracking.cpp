@@ -4,21 +4,21 @@
 void visualTracker(Cuboid3D &model, Cuboid3D &Data, int width, int height)
 {
 	// Initialization
-	vector <State> state = { X, Y, Z, THETAX, THETAY, THETAZ };
+	vector <State> state = { X, Y, Z, R1, R2, R3 };
 	float fov = 60.f;
-	vector <float> defaultParams = { _TX, _TY, _TZ, _RX, _RY, _RZ, _MNUM };
-	int iterations = 1, maxIterations = 5; // Number of non linear fitting iterations
+	Vec3f defaultAxisAngle = euler2AxisAngle(deg2rad(_RX), deg2rad(_RY), deg2rad(_RZ));
+	vector <float> defaultParams = { _TX, _TY, _TZ, defaultAxisAngle.val[0], defaultAxisAngle.val[1], defaultAxisAngle.val[2], _MNUM };
+	int maxIterations = 10; // Number of non linear fitting iterations
 	bool exitFlag = false; // If true, exit application
 	bool updateFlag = true; // If true render again cuboids
 	bool fitFlag = false; // If true start non linear fitting
 	bool demoFlag = false; // If true start demo
 	int mNum = _MNUM;
-	chrono::duration<double> elapsed; // Time elapsed between maxIterations
 	
 	// Virtual camera initialization
-	Camera virtualCam = createCam(Vec3f(_TX, _TY, _TZ), Vec3f(_RX, _RY, _RZ), fov, width, height, state);
+	Camera virtualCam = createCam(Vec3f(_TX, _TY, _TZ), Vec3f(deg2rad(_RX), deg2rad(_RY), deg2rad(_RZ)), fov, width, height, state);
 	// Real camera initialization	
-	Camera realCam = createCam(Vec3f(_TX + 2, _TY, _TZ), Vec3f(_RX, _RY, _RZ), fov, width, height, state);
+	Camera realCam = createCam(Vec3f(_TX + 2, _TY, _TZ), Vec3f(deg2rad(_RX), deg2rad(_RY), deg2rad(_RZ)), fov, width, height, state);
 
 	// Image plane WIDTHxHEIGHT _PIxels
 	Mat imagePlane(height, width, CV_8UC3, CV_RGB(255, 255, 255));
@@ -26,71 +26,117 @@ void visualTracker(Cuboid3D &model, Cuboid3D &Data, int width, int height)
 	Mat imagePlaneData(height, width, CV_8UC3, CV_RGB(255, 255, 255));
 	Mat dataImage(height, width, CV_8UC3, CV_RGB(255, 255, 255));
 	
-	// Distances first partial derivatives
-	Mat Jdijs, dijs;
+	// Distance transform and it's first spatial derivatives
+	Mat distTransform, dxDist, dyDist;
+	// Pointer to a Cuboid2D object
+	Cuboid2D *modelProjection;
+
+#ifdef _LOG
+	// Vector of errors for each fitting
+	Mat err;
+	// Matrix of virtual camera parameters for each iteration
+	Mat x;
+#endif
 
 	while (!exitFlag)
 	{
-		if (updateFlag) // Update image planes
+		// Render model
+		modelProjection = new Cuboid2D(rendering(model, virtualCam, imagePlane, imagePlaneModel, "model"));
+		//Cuboid2D modelProjection = rendering(model, virtualCam, imagePlane, imagePlaneModel, "model");
+		// Render data
+		Cuboid2D dataProjection = rendering(Data, realCam, imagePlane, imagePlaneData, "data");
+		if (updateFlag) // Update image plane
 		{
 			//Update frame
-			Cuboid2D modelProjection = updateFrame(virtualCam, realCam, model, Data, imagePlane, imagePlaneModel, imagePlaneData, dataImage);
-			// Disimillarity between data and model object
-			Mat distTransform, mijs;
-			dissimilarity(modelProjection, imagePlane, dataImage, mNum, mijs, dijs, distTransform);
-			//cout << "Error: " << dijs.t() * dijs << endl;
+			// Draw aliassed image
+			dataImage = Mat(imagePlaneData.size(), dataImage.type(), CV_RGB(255, 255, 255));
+			drawObj(dataProjection, dataImage, dataImage, Vec3b(0, 0, 0), 8);
+			// Display camera parameters
+			dispCamParams(virtualCam, realCam);
 
-			// Display Model - Data dissimilarity
-			dis_PImagePlane("Model - Data image plane", imagePlane);
+			// Calculate distance transform of data and it's first derivatives
+			distTransform = computeDistanceTransform(dataImage);
+			distTransformImageGradient(distTransform, dxDist, dyDist);
 			// Display distance transform image
-			dis_PImagePlane("Distance Transform of data image", normalise(distTransform));
-
-			// Compute first derivatives of 3D homogeneous projection model coordinates
-			// in respect to the state parameters of the camera - extrinsics parameters
-			Jdijs = computeModelFirstDerivatives(model, modelProjection, virtualCam, mijs, distTransform);
+			displayImagePlane("Distance Transform of data image", normalise(distTransform));
 		}
+
+		// Disimillarity between data and model object
+		Mat mijs, dijs;
+		dissimilarity(modelProjection->getEdges(), imagePlane, dataImage, distTransform, mNum, mijs, dijs);
+		// Display Model - Data dissimilarity
+		displayImagePlane("Model - Data image plane", imagePlane);
+		
 
 		if (fitFlag) // Fit model to data
 		{
 #ifdef _COUNT_TIME
 			auto start = chrono::high_resolution_clock::now();
 #endif			
-			// Calculate new extrinsics matrix with smaller error according to data
-			if (iterations == maxIterations)
-			{
-				iterations = 1;
-				fitFlag = false;
-
-#ifdef _DEMO
-				if (demoFlag) // Demo
-				{
-					demoFlag = demo(realCam);
-					fitFlag = true;
-					updateFlag = true;
-				}				
+#ifdef _LOG
+			x.push_back(convertSTLvector2Mat(virtualCam.getParams(), static_cast<int>(virtualCam.getParams().size()), 1, CV_32F).t());
 #endif
-#ifdef _COUNT_TIME
-				cout << "Elapsed time: " << elapsed.count() << " s\n";
-				elapsed = elapsed.zero();
+			for (int i = 0; i < maxIterations; i++)
+			{
+
+				// Update image plane
+				delete modelProjection;
+				modelProjection = new Cuboid2D(rendering(model, virtualCam, imagePlane, imagePlaneModel, "model"));
+			
+				// Disimillarity between data and model object
+				Mat mijs, dijs;
+				dissimilarity(modelProjection->getEdges(), imagePlane, dataImage, distTransform, mNum, mijs, dijs);
+#ifdef _LOG
+				err.push_back(dijs.t() * dijs);
+#endif
+
+				// Compute first derivatives of 3D homogeneous projection model coordinates
+				// in respect to the state parameters of the camera - extrinsics parameters
+				Mat Jdijs = computeModelFirstDerivatives(model, *modelProjection, virtualCam, mijs, dxDist, dyDist);
+
+				// Use non linear fitting to estimate new parameters for virtual camera
+				vector <float> xNew = fittingGaussNewton(virtualCam, Jdijs, dijs);
+				virtualCam.setParams(xNew, virtualCam.getStates());
+#ifdef _LOG
+				x.push_back(convertSTLvector2Mat(virtualCam.getParams(), static_cast<int>(virtualCam.getParams().size()), 1, CV_32F).t());
 #endif
 			}
-			
-			// Use non linear fitting to estimate new parameters for virtual camera
-			vector <float> xNew = fittingGaussNewton(virtualCam, Jdijs, dijs);
-			virtualCam.setParams(xNew, virtualCam.getStates(), DEGREES);
-			++iterations;
+
 #ifdef _COUNT_TIME
 			auto finish = chrono::high_resolution_clock::now();
-			elapsed += finish - start;
+			chrono::duration<double> elapsed = finish - start; // Time elapsed between maxIterations
+			cout << "Elapsed time: " << elapsed.count() << " s\n";
+#endif
+			fitFlag = false;
+			updateFlag = true;
+
+#ifdef _LOG // Update model to extract the last minimum error
+			// Update image plane
+			delete modelProjection;
+			modelProjection = new Cuboid2D(rendering(model, virtualCam, imagePlane, imagePlaneModel, "model"));
+
+			// Disimillarity between data and model object
+			Mat mijs, dijs;
+			dissimilarity(modelProjection->getEdges(), imagePlane, dataImage, distTransform, mNum, mijs, dijs);
+			err.push_back(dijs.t() * dijs);
+			exportFittingData(err, x);
+			err.release();
+			x.release();
+#endif
+
+#ifdef _DEMO
+			if (demoFlag) // Demo
+			{
+				demoFlag = demo(realCam);
+				fitFlag = true;
+				updateFlag = true;
+			}				
 #endif
 		}
 		else
 		{
 			// Keys pressed handler
 			keyboardHandler(virtualCam, realCam, model, Data, mNum, defaultParams, exitFlag, updateFlag, fitFlag, demoFlag);
-			Jdijs.release();
-			dijs.release();
-			elapsed = elapsed.zero();
 		}
 	}
 }
@@ -178,22 +224,13 @@ Cuboid2D rendering(Cuboid3D &cuboid3D, Camera &camera, Mat &imagePlane, Mat &ima
 	}
 	drawObj(objProjection, imagePlane, imagePlaneObj, colour, CV_AA);
 
-#ifdef _IMSHOW
-	// Display image plane object
-	dis_PImagePlane("Image Plane", imagePlane);
-
-	// Display image plane object
-	dis_PImagePlane("Cuboid3D " + type, imagePlaneObj);
-#endif
-
 	return objProjection;
 }
 
 // Dissimilarity between data and model object
-void dissimilarity(Cuboid2D model, Mat &imagePlane, Mat dataImage, int mNum, Mat &mijs, Mat &dijs, Mat &distTransform)
+void dissimilarity(vector <vector <Point2f>> edgesVertices, Mat &imagePlane, Mat dataImage, Mat distTransform, int mNum, Mat &mijs, Mat &dijs)
 {
 	// Initialization
-	vector <vector <Point2f>> edgesVertices = model.getEdges();
 	float offset = 10.f;
 
 	// Construct edges vectors
@@ -208,9 +245,6 @@ void dissimilarity(Cuboid2D model, Mat &imagePlane, Mat dataImage, int mNum, Mat
 	// Draw mijs
 	drawMijs(mijs, imagePlane);
 
-	// Calculate distance transform
-	distTransform = computeDistanceTransform(dataImage);
-	
 	// Calculate dijs
 	dijs = calculateDistance(mijs, distTransform);
 }
@@ -245,12 +279,23 @@ void visibilityCulling(Cuboid3D &cuboid3D, Cuboid2D &cuboid2D, Camera camera, Si
 	vector <int> surfaceVertices, surfaceEdges, edgeVertices;
 	vector <Point2f> pointsPxl;
 
+	// Check if the object is in front of the camera
+	for (int i = 0; i < cuboid3D.getSurfacesSize(); i++)
+	{
+		surfaceVertices = cuboid3D.getSurfaceVertices(i);
+		if (!frontCameraVisibilty(surfaceVertices, cuboid3D.getVertices(), camera))
+		{
+			return;
+		}
+		surfaceVertices.clear();
+	}
+
 	// Visibility culling
 	for (int i = 0; i < cuboid3D.getSurfacesSize(); i++)
 	{
 		// Check if the surface is facing the camera
 		surfaceVertices = cuboid3D.getSurfaceVertices(i);
-		if (!backFaceCulling(surfaceVertices, cuboid3D.getVertices(), camera.getPosition()))
+		if (backFaceCulling(surfaceVertices, cuboid3D.getVertices(), camera.getPosition()))
 		{
 			// Surface i is visible
 			cuboid3D.setSurfaceVisibility(i, true);
@@ -264,7 +309,7 @@ void visibilityCulling(Cuboid3D &cuboid3D, Cuboid2D &cuboid2D, Camera camera, Si
 				pointsPxl.push_back(cuboid2D.getVertexPxl(edgeVertices[0]));
 				pointsPxl.push_back(cuboid2D.getVertexPxl(edgeVertices[1]));
 				// If rendered == true and current edge belongs to the image plane
-				if (cuboid3D.getEdgeVisibility(edge) && edgeClip(pointsPxl, size)) 
+				if (cuboid3D.getEdgeVisibility(edge) && edgeClip(pointsPxl, size))
 				{
 					cuboid2D.setEdge(pointsPxl, edgeVertices);
 				}
@@ -272,8 +317,8 @@ void visibilityCulling(Cuboid3D &cuboid3D, Cuboid2D &cuboid2D, Camera camera, Si
 				edgeVertices.clear();
 			}
 		}
-		surfaceVertices.clear();
 		surfaceEdges.clear();
+		surfaceVertices.clear();
 	}
 }
 
@@ -316,7 +361,7 @@ bool edgeClip(vector <Point2f> &edgePxl, Size size)
 }
 
 // Check if a surface is visible from the camera's viewpoint
-int backFaceCulling(vector <int> surface, vector <Point3f> vertices, Point3f t)
+bool backFaceCulling(vector <int> surface, vector <Point3f> vertices, Point3f t)
 {
 	// Vectors begining from down right vertex of surface
 	Vec3f vec1 = vertices[surface[0]] - vertices[surface[1]];
@@ -333,12 +378,34 @@ int backFaceCulling(vector <int> surface, vector <Point3f> vertices, Point3f t)
 	// If the angle between them is smaller than 90 degrees then the surface it's visible
 	if (theta < 90.f)
 	{
-		return 0;
+		return true;
 	}
 	else
 	{
-		return 1;
+		return false;
 	}
+}
+
+// Front camera visibility
+bool frontCameraVisibilty(vector <int> surface, vector <Point3f> vertices, Camera camera)
+{
+	Vec3f vw;
+	Mat e3 = (Mat_<float>(3, 1) << 0.f, 0.f, 1.f);
+	// Check if the distance of the object to the camera is smaller
+	// than the distance of the image plane of the camera to the camera - focal length in metric units
+	for (int i = 0; i < surface.size(); i++)
+	{
+		vw = vertices[surface[i]];
+		Mat nw = camera.getRotation(static_cast<Rotation>(rotation3Dtype())) * e3;
+		Mat xw = Mat(vw - camera.getPosition());
+		float d = static_cast<float>(xw.dot(nw));
+		if (d <= camera.getFocalMetric())
+		{
+			return false;
+		}
+	}
+
+	return true;
 }
 
 // Fixed time frame update
@@ -367,7 +434,7 @@ Camera createCam(Vec3f t, Vec3f r, float fov, int width, int height, vector <Sta
 	float u0 = static_cast<float>(width) / 2.f, v0 = static_cast<float>(height) / 2.f; // Principal point - center of image plane
 	float focal = (static_cast<float>(width) / 2.f) / (tan((fov / 2.f) * _PI / 180.f)); // Focal length
 
-	return Camera(t, r, Point2f(u0, v0), fov, focal, state);
+	return Camera(t, r, Point2f(u0, v0), fov, focal, state, static_cast<Rotation>(rotation3Dtype()));
 }
 
 // Clear visibility of the 3D model
@@ -380,7 +447,7 @@ void resetVisibility(Cuboid3D &cuboid3D)
 }
 
 // Display image plane
-void dis_PImagePlane(string windowName, Mat imagePlane)
+void displayImagePlane(string windowName, Mat imagePlane)
 {
 	namedWindow(windowName, WINDOW_AUTOSIZE);
 	imshow(windowName, imagePlane);
@@ -584,23 +651,18 @@ void distTransformImageGradient(Mat distTransform, Mat &dxdist, Mat &dydist)
 }
 
 // Compute dijs first derivatives
-Mat computeModelFirstDerivatives(Cuboid3D model, Cuboid2D modelProjection, Camera virtualCam, Mat mijs, Mat distTransform)
+Mat computeModelFirstDerivatives(Cuboid3D model, Cuboid2D modelProjection, Camera virtualCam, Mat mijs, Mat dxDist, Mat dyDist)
 {
 	Mat V, Vph, K, x;
 	vector <Parameter> xk;
 	extractDataForDerivatives(model, modelProjection, virtualCam, V, Vph, K, x, xk);
 	Mat Jvph = jacobianPerspectiveProjection(V, K, x, xk);
 	// Compute first derivatives of 2D projection model _PIxel coordinates
-	Mat Jvp = jacobian_PIxelCoordinates(Vph, Jvph);
+	Mat Jvp = jacobianPixelCoordinates(Vph, Jvph);
 	// Compute first derivatives of 2D projection model edges
 	Mat Jep = jacobianEdges(Jvp, modelProjection.getEdgesPtr());
 	// Compute first derivatives of mijs
 	Mat Jmijs = jacobianMijs(Jep, mijs.rows + 2);
-	// Compute image gradient dx, dy
-	Mat dxDist, dyDist;
-	distTransformImageGradient(distTransform, dxDist, dyDist);
-	dis_PImagePlane("Dx of Distance Transform", normalise(dxDist));
-	dis_PImagePlane("Dy of Distance Trasnform", normalise(dyDist));
 	// Compute first derivatives of distances dijs
 	Mat Jdijs = jacobianDijs(mijs, Jmijs, dxDist, dyDist);
 
@@ -617,29 +679,19 @@ vector <float> fittingGaussNewton(Camera virtualCam, Mat Jdijs, Mat dijs)
 	Mat Jinv;
 	invert(Jdijs.t() * Jdijs, Jinv); // Pseudo inverse
 	Mat err = Jinv * Jdijs.t() * dijs; // error
-	if (virtualCam.getRotationType() == EULER)
-	{
-		for (int i = 0; i < states.size(); i++)
-		{
-			if ((states[i] >= 3) && (states[i] <= 5))
-			{
-				err.at<float>(i, 0) = rad2deg(err.at<float>(i, 0)); // Angle parameters convert to degrees
-			}
-		}
-	}
-	else
-	{
-		Vec3f axis(err.at<float>(3, 0), err.at<float>(4, 0), err.at<float>(5, 0));
-		float angle = norm2(axis);
-		axis /= angle;
-		Vec4f axisAngle(axis[0], axis[1], axis[2], angle);
-		Vec3f eulerAngles = axisAngle2euler(axisAngle);
-		err.at<float>(3, 0) = eulerAngles[0];
-		err.at<float>(4, 0) = eulerAngles[1];
-		err.at<float>(5, 0) = eulerAngles[2];
-	}
 
+	Vec3f eulerAngles = axisAngle2euler(Vec3f(x.at<float>(3, 0), x.at<float>(4, 0), x.at<float>(5, 0)));
+	Vec3f eulerAngles_err = axisAngle2euler(Vec3f(err.at<float>(3, 0), err.at<float>(4, 0), err.at<float>(5, 0)));
+	Vec3f eulerAngles_New = eulerAngles - eulerAngles_err;
+	Vec3f axisAngle = euler2AxisAngle(eulerAngles_New.val[0], eulerAngles_New.val[1], eulerAngles_New.val[2]);
+	/*Mat R1 = axisAngle2Matrix(Vec3f(x.at<float>(3, 0), x.at<float>(4, 0), x.at<float>(5, 0)));
+	Mat R2 = axisAngle2Matrix(Vec3f(err.at<float>(3, 0), err.at<float>(4, 0), err.at<float>(5, 0)));
+	Vec3f axisAngle = matrix2AxisAngle(R2 * R1);*/
+	
 	xNew = x - err; // Remove error from parameters
+	xNew.at<float>(3, 0) = axisAngle.val[0];
+	xNew.at<float>(4, 0) = axisAngle.val[1];
+	xNew.at<float>(5, 0) = axisAngle.val[2];
 
 	return xNew;
 }
@@ -673,7 +725,7 @@ bool demo(Camera &realCam)
 	{// Move realCam
 		
 		vector <float> params = realCam.getParams();
-		
+		Vec3f eulerAngles = axisAngle2euler(Vec3f(params[3], params[4], params[5]));
 		if (iter < (maxIter / 2))
 		{
 			params[0] -= 0.5f;
@@ -681,15 +733,70 @@ bool demo(Camera &realCam)
 		else
 		{
 			params[0] -= 0.5f;
-			params[4] -= 0.75f;
+			eulerAngles.val[1] -= deg2rad(0.75f);
 			params[1] += 0.25f;
-			params[5] -= 0.25f;
+			eulerAngles.val[2] -= deg2rad(0.25f);
 			params[2] -= 0.25f;
 		}
-		
+		Vec3f axisAngle = euler2AxisAngle(eulerAngles.val[0], eulerAngles.val[1], eulerAngles.val[2]);
+		params[3] = axisAngle.val[0];
+		params[4] = axisAngle.val[1];
+		params[5] = axisAngle.val[2];
 
-		realCam.setParams(params, { X, Y, Z, THETAX, THETAY, THETAZ }, DEGREES);
+		realCam.setParams(params, { X, Y, Z, R1, R2, R3 });
 		
 		return true;
 	}
+}
+
+// Export fitting data
+void exportFittingData(Mat m, Mat x)
+{
+	ofstream out;
+	out.open("data/fitting_data.txt", ofstream::out | ofstream::app);
+	if (!out.is_open())
+	{
+		cout << "Problem with opening the file." << endl;
+		return;
+	}
+	string sM = "E = [";
+	string sX = "X = [";
+	if (x.rows == m.rows)
+	{
+		for (int i = 0; i < m.rows; i++)
+		{
+			ostringstream convert1;
+			convert1 << m.at<float>(i, 0);
+			sM += convert1.str();
+			for (int j = 0; j < x.cols; j++)
+			{
+				ostringstream convert2;
+				convert2 << x.at<float>(i, j);
+				sX += convert2.str();
+				if (j < (x.cols - 1))
+				{
+					sX += " ";
+				}
+			}
+			if (i < (m.rows - 1))
+			{
+				sM += " ";
+				sX += ";\n";
+			}
+		}
+	}
+	else
+	{
+		cout << "The two input matrices must have the same number of rows." << endl;
+		out.close();
+		return;
+	}
+	sM += "];";
+	sX += "];";
+	out << sM;
+	out << endl;
+	out << sX;
+	out << endl;
+	out.flush();
+	out.close();
 }

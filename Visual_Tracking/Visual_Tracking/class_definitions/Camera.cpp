@@ -1,14 +1,14 @@
 #include "..\headers\Camera.h"
 
-Camera::Camera(Vec3f tVal, Vec3f eulerAnglesVal, Point2f principalVal, float fovVal, float focal_PIxelsVal, vector <State> stateVal, Rotation RtypeVal) // Constructor
+Camera::Camera(Vec3f tVal, Vec3f eulerAnglesVal, Point2f principalVal, float fovVal, float focalPixelsVal, vector <State> stateVal, Rotation RtypeVal) // Constructor
 	: CameraStateSpace(tVal.val[0], tVal.val[1], tVal.val[2], eulerAnglesVal.val[0], eulerAnglesVal.val[1], eulerAnglesVal.val[2], stateVal)
 {
 	// Intrinsics initialization
 	principalPoint = principalVal;
 	fov = fmod(fmod(fovVal, _DEG) + _DEG, _DEG);
-	focalPixels = checkFocal(focal_PIxelsVal);
-	focalMetric = focal_PIxelsVal / _Kp;
-	width = static_cast<int>(2.f * focal_PIxelsVal * tan(deg2rad(fovVal / 2.f)));
+	focalPixels = checkFocal(focalPixelsVal);
+	focalMetric = focalPixelsVal / _Kp;
+	width = static_cast<int>(2.f * focalPixelsVal * tan(deg2rad(fovVal / 2.f)));
 	Rtype = RtypeVal;
 }
 
@@ -32,7 +32,7 @@ Point2f Camera::getPrincipal() const
 // Change fov
 void Camera::setFov(float fovVal)
 {
-	fov = fmod(fmod(fovVal, DEG) + DEG, DEG);
+	fov = fmod(fmod(fovVal, _DEG) + _DEG, _DEG);
 	focalPixels = static_cast<float>(width) / (2.f * tan(deg2rad(fov / 2.f)));
 	focalMetric = focalPixels / _Kp;
 }
@@ -90,10 +90,7 @@ void Camera::setRotation(Mat RVal)
 {
 	if (IsRotationMatrix(RVal))
 	{
-		Vec3f eulerAngles(matrix2euler(RVal));
-		setThetaX(eulerAngles.val[0], DEGREES);
-		setThetaY(eulerAngles.val[1], DEGREES);
-		setThetaZ(eulerAngles.val[2], DEGREES);
+		setAxisAngle(matrix2AxisAngle(RVal));
 	}
 	else
 	{
@@ -106,11 +103,11 @@ Mat Camera::getRotation(Rotation type) const
 {
 	if (type == EULER) // Get rotation matrix from euler angles
 	{
-		return eulerAngles2Matrix(getThetaX(DEGREES), getThetaY(DEGREES), getThetaZ(DEGREES));
+		return eulerAngles2Matrix(getThetaX(RADIANS), getThetaY(RADIANS), getThetaZ(RADIANS));
 	}
-	else // Get rotation matrix from axis angles
+	else // Get rotation matrix from axis angle
 	{
-		return axisAngle2Matrix(euler2AxisAngle(getThetaX(DEGREES), getThetaY(DEGREES), getThetaZ(DEGREES)));
+		return axisAngle2Matrix(getAxisAngle());
 	}
 }
 
@@ -153,78 +150,26 @@ Mat Camera::getExtrinsics(Rotation type)
 	return (Mat_<float>(3, 4) << Rt.at<float>(0, 0), Rt.at<float>(0, 1), Rt.at<float>(0, 2), RtT[0], Rt.at<float>(1, 0), Rt.at<float>(1, 1), Rt.at<float>(1, 2), RtT[1], Rt.at<float>(2, 0), Rt.at<float>(2, 1), Rt.at<float>(2, 2), RtT[2]);
 }
 
-// Return projection first derivative with respect of the i-th
-// se(3) Lie algebra generator.
-Mat Camera::getLieAlgebraDerivative(int idx)
-{
-	return getIntrinsics() * getExtrinsics(EULER) * getGenerator(idx);
-}
-
-// Get i-th se(3) Lie algebra generator
-Mat Camera::getGenerator(int idx) const
-{
-	if ((idx > 5) || (idx < 0))
-	{
-		cout << "se(3) Lie algebra contains only six generators." << endl;
-		return Mat();
-	}
-
-	Mat G = Mat::zeros(Size(4, 4), CV_32F);
-	switch (idx)
-	{
-		case 0: // generator - derivative with respect of tx at identity transformation
-		{
-			G.at<float>(0, 3) = 1.f;
-			break;
-		}
-		case 1: // generator - derivative with respect of ty at identity transformation
-		{
-			G.at<float>(1, 3) = 1.f;
-			break;
-		}
-		case 2: // generator - derivative with respect of tz at identity transformation
-		{
-			G.at<float>(2, 3) = 1.f;
-			break;
-		}
-		case 3: // generator - derivative with respect of thetax at identity transformation
-		{
-			G.at<float>(1, 2) = -1.f;
-			G.at<float>(2, 1) = 1.f;
-			break;
-		}
-		case 4: // generator - derivative with respect of thetay at identity transformation
-		{
-			G.at<float>(0, 2) = 1.f;
-			G.at<float>(2, 0) = -1.f;
-			break;
-		}
-		case 5: // generator - derivative with respect of thetaz at identity transformation
-		{
-			G.at<float>(0, 1) = -1.f;
-			G.at<float>(1, 0) = 1.f;
-			break;
-		}
-	}
-
-	return G;
-}
-
 // Set camera parameters
-void Camera::setParams(vector <float> paramsVal, vector <State> stateVal, Angle angle)
+void Camera::setParams(vector <float> paramsVal, vector <State> stateVal)
 {
+	// Check number of states
 	if (stateVal.size() > 6)
 	{
 		cout << "Up to 6 state parameters are allowed." << endl;
 		return;
 	}
 
+	// Check if the two inputs match
 	if (stateVal.size() != paramsVal.size())
 	{
 		cout << "Parameters values and states STL vectors must be of the same size." << endl;
 		return;
 	}
-
+	
+	// Update camera state space
+	float r1, r2, r3;
+	bool r1Flag = false, r2Flag = false, r3Flag = false;
 	for (int i = 0; i < stateVal.size(); i++)
 	{
 		switch (stateVal[i])
@@ -238,18 +183,33 @@ void Camera::setParams(vector <float> paramsVal, vector <State> stateVal, Angle 
 		case Z:
 			setTz(paramsVal[i]);
 			break;
-		case THETAX:
-			setThetaX(paramsVal[i], angle);
+		case R1:
+		{
+			r1 = paramsVal[i];
+			r1Flag = true;
 			break;
-		case THETAY:
-			setThetaY(paramsVal[i], angle);
+		}
+		case R2:
+		{
+			r2 = paramsVal[i];
+			r2Flag = true;
 			break;
-		case THETAZ:
-			setThetaZ(paramsVal[i], angle);
+		}
+		case R3:
+		{
+			r3 = paramsVal[i];
+			r3Flag = true;
 			break;
+		}
 		default:
 			break;
 		}
+	}
+
+	// Update r1, r2, r3
+	if ((r1Flag == true) && (r2Flag == true) && (r3Flag == true))
+	{
+		setAxisAngle(Vec3f(r1, r2, r3));
 	}
 }
 
