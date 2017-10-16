@@ -23,45 +23,31 @@ using namespace std;
 #include "mathLinearAlgebra.h"
 #include "controls.h"
 
-// Number of mijs
-#define _MNUM 21
-
 #define _COUNT_TIME
-//#define _LOG
-//#define _DEMO
-
-#ifdef _DEMO
-// Virtual Camera default extrinsics parameters
-#define _TX 27.f
-#define _TY 18.f
-#define _TZ 80.f
-#define _RX 160.f
-#define _RY -11.f
-#define _RZ 0.f
-#else
-// Virtual Camera default extrinsics parameters
-#define _TX -43.f //-28.f
-#define _TY 92.0f //30.f
-#define _TZ 80.f
-#define _RX 127.f //160.f
-#define _RY -41.f //-30.f
-#define _RZ 0.f
-#endif
 
 // Visual tracker main function
-void visualTracker(Cuboid3D &model, Cuboid3D &Data, Mat src, int width, int height);
+void visualTracker(Cuboid3D &model);
 
 // Read model data from .x file
-void modelData(float &length, float &height, float &width);
+void modelData(string filename, float &length, float &height, float &width);
+
+// Read from .txt file camera parameters
+void configCameraData(string configFilename, float & tX, float & tY, float & tZ, float & RX, float & RY, float & RZ, float & fov);
+
+// Miscellaneous parameters	- image plane, fitting and Canny edge
+void configParamsData(string configParamsFilename, int & imageWidth, int & imageHeight, int & mNum, int & maxIterations, float & threshold, float & ratio, int & kernel);
+
+// Update filenames
+void readFilenames(string &srcImageFilename, string &configParamsFilename, string & modelFilename, string & configCameraFilename, Mat & srcData);
 
 // Render function
-Cuboid2D rendering(Cuboid3D &cuboid3D, Camera &camera, Mat &imagePlane, Mat &imagePlaneObj, string type);
+Cuboid2D rendering(Cuboid3D &cuboid3D, Camera &camera, Mat &imagePlane, Vec3b colour);
 
 // Dissimilarity between data and model object
-void dissimilarity(vector <vector <Point2f>> edgesVertices, Mat &imagePlane, Mat dataImage, Mat distTransform, int mNum, Mat &mijs, Mat &dijs);
+void dissimilarity(vector <vector <Point2f>> edgesVertices, Mat &imagePlane, Mat dataImage, Mat distTransform, int mNum, Mat &mijs = Mat(), Mat &dijs = Mat());
 
 // Draw object on image planes
-void drawObj(Cuboid2D objProjection, Mat &imagePlane, Mat &imagePlaneObj, Vec3b colour, int lineType);
+void drawObj(Cuboid2D objProjection, Mat &imagePlane, Vec3b colour, int lineType);
 
 // Check which parts of the object are visible from the camera's given viewpoint
 void visibilityCulling(Cuboid3D &cuboid3D, Cuboid2D &cuboid2D, Camera camera, Size size);
@@ -74,9 +60,6 @@ bool backFaceCulling(vector <int> surface, vector <Point3f> vertices, Point3f t)
 
 // Front camera visibility
 bool frontCameraVisibilty(vector<int> surface, vector<Point3f> vertices, Camera camera);
-
-// Fixed time frame update
-Cuboid2D updateFrame(Camera &virtualCam, Camera &realCam, Cuboid3D &model, Cuboid3D &Data, Mat &imagePlane, Mat &imagePlaneModel, Mat &imagePlaneData, Mat &dataImg);
 
 // Create camera
 Camera createCam(Vec3f t, Vec3f r, float fov, int width, int height, vector <State> state);
@@ -100,9 +83,6 @@ Mat edgesVectors(vector <vector <Point2f>> edges);
 // Calculate edges direction vectors
 Mat edgesDirectionVectors(vector <vector <Point2f>> edges);
 
-// Calculate edges normal unit vectors
-Mat edgesNormalVectors(Mat edgesVec);
-
 // Calculate the subintervals mijs for all edges
 Mat edgesSubIntervals(Mat edgesVec, vector<vector<Point2f>> edgesVertices, int mNum);
 
@@ -111,9 +91,6 @@ Mat subIntervalsNormals(Mat mijs, Mat edgesNormals, float offset, Size size);
 
 // Draw mijs and mijs normal lines on each edge of the model
 void drawMijs(Mat mijs, Mat & imagePlane);
-
-// Compute the distance transform for the data object
-Mat computeDistanceTransform(Mat dataImage);
 
 // Convert to display distance transform
 Mat normalise(Mat Img);
@@ -134,8 +111,6 @@ vector<float> fittingGaussNewton(Camera virtualCam, Mat Jdijs, Mat dijs);
 template<typename T>
 void errorSize(string input1, string input2, T size1, T size2, string filename, int line);
 
-// Demo
-bool demo(Camera & realCam);
 // Export fitting data
 void exportFittingData(Mat m, Mat x);
 
@@ -144,3 +119,6 @@ Mat detectEdges(Mat img, double threshold, double ratio, int kernel);
 
 // Invert binary images
 Mat invertBinaryImage(Mat binaryImg);
+
+
+void playVideo(Cuboid3D model, vector <float> params, float fov, int imageWidth, int imageHeight, int maxIterations, float threshold, float ratio, int kernel);

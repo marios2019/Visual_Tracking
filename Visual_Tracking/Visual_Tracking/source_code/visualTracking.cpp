@@ -684,9 +684,6 @@ vector <float> fittingGaussNewton(Camera virtualCam, Mat Jdijs, Mat dijs)
 	Vec3f eulerAngles_err = axisAngle2euler(Vec3f(err.at<float>(3, 0), err.at<float>(4, 0), err.at<float>(5, 0)));
 	Vec3f eulerAngles_New = eulerAngles - eulerAngles_err;
 	Vec3f axisAngle = euler2AxisAngle(eulerAngles_New.val[0], eulerAngles_New.val[1], eulerAngles_New.val[2]);
-	/*Mat R1 = axisAngle2Matrix(Vec3f(x.at<float>(3, 0), x.at<float>(4, 0), x.at<float>(5, 0)));
-	Mat R2 = axisAngle2Matrix(Vec3f(err.at<float>(3, 0), err.at<float>(4, 0), err.at<float>(5, 0)));
-	Vec3f axisAngle = matrix2AxisAngle(R2 * R1);*/
 	
 	xNew = x - err; // Remove error from parameters
 	xNew.at<float>(3, 0) = axisAngle.val[0];

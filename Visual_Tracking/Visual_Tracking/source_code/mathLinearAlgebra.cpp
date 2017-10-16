@@ -496,17 +496,98 @@ Mat cameraRotationFirstDerivative(Parameter xk, Mat x)
 		case X2: // x = tz
 			return Mat::zeros(3, 3, CV_32F);
 		case X3: // x = r1
-			return (axisAngleFirstDerivative_term1(axisAngle, xk) + axisAngleFirstDerivative_term2(axisAngle, xk));
+			return axisAngleFirstDerivative(axisAngle, xk);
 		case X4: // x = r2
-			return (axisAngleFirstDerivative_term1(axisAngle, xk) + axisAngleFirstDerivative_term2(axisAngle, xk));
+			return axisAngleFirstDerivative(axisAngle, xk);
 		case X5: // x = r3
-			return (axisAngleFirstDerivative_term1(axisAngle, xk) + axisAngleFirstDerivative_term2(axisAngle, xk));
+			return axisAngleFirstDerivative(axisAngle, xk);
 		default:
 		{
 			cout << "Not valid state parameter." << endl;
 			return Mat();
 		}
 	}	
+}
+
+// Return axis angle matrix derivative
+Mat axisAngleFirstDerivative(Vec3f axisAngle, Parameter xk)
+{	
+	Mat dR(3, 3, CV_32F);
+	
+	for (int i = 0; i < dR.rows; i++)
+	{
+		for (int j = 0; j < dR.cols; j++)
+		{
+			if (i == j)
+			{// Calculate derivative of diagonal elements
+				dR.at<float>(i, j) = diagonalElementsDerivatives(axisAngle, xk, i);
+			}
+			else
+			{// Calculate derivative of the non diagonal elements - the matrix is like a skew symmetric
+				dR.at<float>(i, j) = elementsDerivatives(axisAngle, xk, i, j);
+			}
+		}
+	}
+
+	return dR;
+}
+
+// First derivvative of diagonal elements of axis angle matrix
+float diagonalElementsDerivatives(Vec3f axisAngle, Parameter xk, int elem)
+{
+	if ((xk < X3) || (xk > X5))
+	{
+		cout << "Invalid state parameter: " << xk << "; should be between X3(3) and X5(5)" << endl;
+		return 0.f;
+	}
+
+	// diagonal element first derivative
+	int parameter = static_cast<int>(xk) - 3;
+	Vec3f e = basis3DVectors(elem);
+	float theta = norm2(axisAngle);
+	float drii = 2.f * (e.val[parameter] * theta * theta - axisAngle.val[elem] * axisAngle.val[elem] * axisAngle.val[parameter]) * (1.f - cos(theta));
+	drii += axisAngle.val[parameter] * theta * sin(theta) * (axisAngle.val[elem] * axisAngle.val[elem] - theta * theta);
+	theta = max(theta, 0.1f);
+	drii /= pow(theta, 4.f);
+
+	return drii;
+}
+
+// First derivative of non diagonal elements of axis angle matrix - it's similar to a skew symmetric matrix
+float elementsDerivatives(Vec3f axisAngle, Parameter xk, int row, int col)
+{
+	if ((xk < X3) || (xk > X5))
+	{
+		cout << "Invalid state parameter: " << xk << "; should be between X3(3) and X5(5)" << endl;
+		return 0.f;
+	}
+
+	// non diagonal element first derivative
+	int parameter = static_cast<int>(xk) - 3;
+	int lastElem = 3 - (row + col);
+	Vec3f ei = basis3DVectors(row);
+	Vec3f ej = basis3DVectors(col);
+	Vec3f elast = basis3DVectors(lastElem);
+	float theta = norm2(axisAngle);
+	float drijFirstTerm = (ei.val[parameter] * theta * theta - axisAngle.val[row] * axisAngle.val[parameter]) * axisAngle.val[col];
+	drijFirstTerm += (ej.val[parameter] * theta * theta - axisAngle.val[col] * axisAngle.val[parameter]) * axisAngle.val[row];
+	drijFirstTerm /= pow(max(theta, 0.1f), 4.f);
+	drijFirstTerm *= (1.f - cos(theta));
+	float drijSecondTerm = 0.f;
+	if (((row == 0) && (col == 1)) || ((row == 1) && (col == 2)) || ((row == 2) && (col == 0)))
+	{
+		drijSecondTerm += (axisAngle.val[row] * axisAngle.val[col] - axisAngle.val[lastElem]) * axisAngle.val[parameter] / pow(max(theta, 0.01f), 2.f);
+		drijSecondTerm -= (elast.val[parameter] * theta * theta - axisAngle.val[lastElem] * axisAngle.val[parameter]) / pow(max(theta, 0.1f), 3.f);
+		drijSecondTerm *= sin(theta);
+	}
+	else
+	{
+		drijSecondTerm += (axisAngle.val[row] * axisAngle.val[col] + axisAngle.val[lastElem]) * axisAngle.val[parameter] / pow(max(theta, 0.01f), 2.f);
+		drijSecondTerm += (elast.val[parameter] * theta * theta - axisAngle.val[lastElem] * axisAngle.val[parameter]) / pow(max(theta, 0.1f), 3.f);
+		drijSecondTerm *= sin(theta);
+	}
+
+	return drijFirstTerm + drijSecondTerm;
 }
 
 // Axis angle rotation matrix partial derivative - first term ([normalised(r)]x * sin(theta))
@@ -669,6 +750,19 @@ float cosFirstDerivative(Vec3f v, int vi)
 
 	// Chain rule
 	return -sin(theta) * dnorm;
+}
+
+// Return the basis vectors of the 3d space
+Vec3f basis3DVectors(int dim)
+{
+	if ((dim < 0) || (dim > 2))
+	{
+		cout << "Invalid dimension dim:" << dim << " ;this a basis of the 3d space" << endl;
+		return Vec3f(1.f, 0.f, 0.f);
+	}
+	Mat I = Mat::eye(3, 3, CV_32F);
+
+	return I.at<Vec3f>(dim, 0);
 }
 
 // Get 3D rotation representation type

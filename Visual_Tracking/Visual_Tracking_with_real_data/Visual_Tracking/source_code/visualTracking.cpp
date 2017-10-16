@@ -1,164 +1,161 @@
 #include "../headers/visualTracking.h"
 
 // Visual tracker main function
-void visualTracker(Cuboid3D &model, Cuboid3D &Data, Mat src, int width, int height)
+void visualTracker(Cuboid3D &model)
 {
 	// Initialization
 	vector <State> state = { X, Y, Z, R1, R2, R3 };
-	float fov = 60.f;
-	Vec3f defaultAxisAngle = euler2AxisAngle(deg2rad(_RX), deg2rad(_RY), deg2rad(_RZ));
-	vector <float> defaultParams = { _TX, _TY, _TZ, defaultAxisAngle.val[0], defaultAxisAngle.val[1], defaultAxisAngle.val[2], _MNUM };
-	int maxIterations = 10; // Number of non linear fitting iterations
+	float tX, tY, tZ, RX, RY, RZ, fov; // Camera parameters
+	int imageWidth, imageHeight; // Image plane parameters
+	int maxIterations, mNum; // Fitting parameters
+	float threshold, ratio; int kernel; // Canny edge parameters
+	string configParamsFilename = "config_params.txt"; // Miscellaneous parameters
+	string modelFilename = "cube.x";
+	string srcImageFilename = "data/cuboid2/cube2.jpg";
+	Mat srcData = imread(srcImageFilename); // Cube image
+	string configCameraFilename = "config_cam.txt";	// Camera parameters
+	configCameraData(configCameraFilename, tX, tY, tZ, RX, RY, RZ, fov); // Read camera parameters
+	configParamsData(configParamsFilename, imageWidth, imageHeight, mNum, maxIterations, threshold, ratio, kernel); // Miscellaneous parameters
+	// Default parameters
+	Vec3f defaultAxisAngle = euler2AxisAngle(deg2rad(RX), deg2rad(RY), deg2rad(RZ));
+	vector <float> defaultParams = { tX, tY, tZ, defaultAxisAngle.val[0], defaultAxisAngle.val[1], defaultAxisAngle.val[2], static_cast<float>(mNum) };
 	bool exitFlag = false; // If true, exit application
-	bool updateFlag = true; // If true render again cuboids
+	bool updateModelFlag = true; // If true render model
 	bool fitFlag = false; // If true start non linear fitting
-	bool demoFlag = false; // If true start demo
-	int mNum = _MNUM;
+	bool readFilesFlag = false; // Read again model .x and parameters .txt files
+	bool updateFilenamesFlag = false; // Change filenames
+	bool videoFlag = false; // Fitting on video
+	Vec3b modelColour = Vec3b(0, 255, 0);
 
-	// Resize src image to _HEIGHT and _WIDTH of the image plane of the virtual camera
-	Mat cube;
-	resize(src, cube, Size(width, height));
-	displayImagePlane("Data image", cube);
-	
 	// Virtual camera initialization
-	Camera virtualCam = createCam(Vec3f(_TX, _TY, _TZ), Vec3f(deg2rad(_RX), deg2rad(_RY), deg2rad(_RZ)), fov, width, height, state);
-	// Real camera initialization	
-	Camera realCam = createCam(Vec3f(_TX + 2, _TY, _TZ), Vec3f(deg2rad(_RX), deg2rad(_RY), deg2rad(_RZ)), fov, width, height, state);
-
-	// Image plane WIDTHxHEIGHT _PIxels
-	Mat imagePlane(height, width, CV_8UC3, CV_RGB(255, 255, 255));
-	Mat imagePlaneModel(height, width, CV_8UC3, CV_RGB(255, 255, 255));
-	Mat imagePlaneData(height, width, CV_8UC3, CV_RGB(255, 255, 255));
-	Mat dataImage(height, width, CV_8UC3, CV_RGB(255, 255, 255));
-	
+	Camera virtualCam = createCam(Vec3f(tX, tY, tZ), Vec3f(deg2rad(RX), deg2rad(RY), deg2rad(RZ)), fov, imageWidth, imageHeight, state);
+		
 	// Distance transform and it's first spatial derivatives
 	Mat distTransform, dxDist, dyDist;
 	// Pointer to a Cuboid2D object
 	Cuboid2D *modelProjection;
-
-#ifdef _LOG
-	// Vector of errors for each fitting
-	Mat err;
-	// Matrix of virtual camera parameters for each iteration
-	Mat x;
-#endif
+	
+	// Image plane WIDTHxHEIGHT pixels
+	Mat imagePlane(Size(imageWidth, imageHeight), CV_8UC3, CV_RGB(255, 255, 255));
+	// Cube image
+	Mat cube;
+	// Inverted binary 
+	Mat cubeEdgesInv;
 
 	while (!exitFlag)
 	{
-		Mat imagePlane;
+#ifdef _COUNT_TIME
+		auto start = chrono::high_resolution_clock::now();
+#endif			
+		// Render src data image
+		// Resize src image to _HEIGHT and _WIDTH of the image plane of the virtual camera
+		resize(srcData, cube, Size(imageWidth, imageHeight));
 		cube.copyTo(imagePlane);
-		// Render model
-		modelProjection = new Cuboid2D(rendering(model, virtualCam, imagePlane, imagePlaneModel, "model"));
-		//// Render data
-		//Cuboid2D dataProjection = rendering(Data, realCam, imagePlane, imagePlaneData, "data");
-
-		Mat cubeEdges = detectEdges(cube, 10.0, 3.0, 3);
-		Mat cubeEdgesInv = invertBinaryImage(cubeEdges);
-		displayImagePlane("canny edges", cubeEdges);
-
-		if (updateFlag) // Update image plane
-		{
-			//Update frame
-			// Draw aliassed image
-			/*dataImage = Mat(imagePlaneData.size(), dataImage.type(), CV_RGB(255, 255, 255));
-			drawObj(dataProjection, dataImage, dataImage, Vec3b(0, 0, 0), 8);*/
-			// Display camera parameters
-			dispCamParams(virtualCam, realCam);
-
-			// Calculate distance transform of data and it's first derivatives
-			distTransform = computeDistanceTransform(cubeEdgesInv);
-			distTransformImageGradient(distTransform, dxDist, dyDist);
-			// Display distance transform image
-			displayImagePlane("Distance Transform of data image", normalise(distTransform));
-		}
-
-		// Disimillarity between data and model object
-		Mat mijs, dijs;
-		dissimilarity(modelProjection->getEdges(), imagePlane, cubeEdgesInv, distTransform, mNum, mijs, dijs);
-		// Display Model - Data dissimilarity
-		displayImagePlane("Model - Data image plane", imagePlane);
 		
+		// Detect data object edges
+		Mat cubeEdges = detectEdges(cube, threshold, ratio, kernel);
+		// Invert binary image for distance transform
+		cubeEdgesInv.release();
+		cubeEdgesInv = invertBinaryImage(cubeEdges);
+		// Calculate distance transform of data and it's first derivatives
+		distanceTransform(cubeEdgesInv, distTransform, CV_DIST_L2, 3);
+		distTransformImageGradient(distTransform, dxDist, dyDist);
+		
+		if (updateModelFlag) // Update model
+		{
+			// Render model
+			modelProjection = new Cuboid2D(rendering(model, virtualCam, imagePlane, modelColour));
+			// Disimillarity between data and model object
+			dissimilarity(modelProjection->getEdges(), imagePlane, cubeEdgesInv, distTransform, mNum);
+		}		  	
 
 		if (fitFlag) // Fit model to data
 		{
-#ifdef _COUNT_TIME
-			auto start = chrono::high_resolution_clock::now();
-#endif			
-#ifdef _LOG
-			x.push_back(convertSTLvector2Mat(virtualCam.getParams(), virtualCam.getParams().size(), 1, CV_32F).t());
-#endif
 			for (int i = 0; i < maxIterations; i++)
 			{
-
-				// Update image plane
+				// Update model
+				Mat imagePlaneModel(Size(imageWidth, imageHeight), CV_8UC3, CV_RGB(255, 255, 255));
 				delete modelProjection;
-				modelProjection = new Cuboid2D(rendering(model, virtualCam, imagePlane, imagePlaneModel, "model"));
+				modelProjection = new Cuboid2D(rendering(model, virtualCam, imagePlaneModel, modelColour));
 			
 				// Disimillarity between data and model object
 				Mat mijs, dijs;
-				dissimilarity(modelProjection->getEdges(), imagePlane, cubeEdgesInv, distTransform, mNum, mijs, dijs);
-#ifdef _LOG
-				err.push_back(dijs.t() * dijs);
-#endif
-
+				dissimilarity(modelProjection->getEdges(), imagePlaneModel, cubeEdgesInv, distTransform, mNum, mijs, dijs);
 				// Compute first derivatives of 3D homogeneous projection model coordinates
 				// in respect to the state parameters of the camera - extrinsics parameters
 				Mat Jdijs = computeModelFirstDerivatives(model, *modelProjection, virtualCam, mijs, dxDist, dyDist);
-
 				// Use non linear fitting to estimate new parameters for virtual camera
 				vector <float> xNew = fittingGaussNewton(virtualCam, Jdijs, dijs);
 				virtualCam.setParams(xNew, virtualCam.getStates());
-#ifdef _LOG
-				x.push_back(convertSTLvector2Mat(virtualCam.getParams(), virtualCam.getParams().size(), 1, CV_32F).t());
-#endif
 			}
-
-#ifdef _COUNT_TIME
-			auto finish = chrono::high_resolution_clock::now();
-			chrono::duration<double> elapsed = finish - start; // Time elapsed between maxIterations
-			cout << "Elapsed time: " << elapsed.count() << " s\n";
-#endif
-			fitFlag = false;
-			updateFlag = true;
-
-#ifdef _LOG // Update model to extract the last minimum error
-			// Update image plane
+			// Render src data image
+			cube.copyTo(imagePlane);
+			// Render model
 			delete modelProjection;
-			modelProjection = new Cuboid2D(rendering(model, virtualCam, imagePlane, imagePlaneModel, "model"));
-
-			// Disimillarity between data and model object
-			Mat mijs, dijs;
-			dissimilarity(modelProjection->getEdges(), imagePlane, dataImage, distTransform, mNum, mijs, dijs);
-			err.push_back(dijs.t() * dijs);
-			exportFittingData(err, x);
-			err.release();
-			x.release();
-#endif
-
-#ifdef _DEMO
-			if (demoFlag) // Demo
-			{
-				demoFlag = demo(realCam);
-				fitFlag = true;
-				updateFlag = true;
-			}				
-#endif
+			modelProjection = new Cuboid2D(rendering(model, virtualCam, imagePlane, modelColour));
+			dissimilarity(modelProjection->getEdges(), imagePlane, cubeEdgesInv, distTransform, mNum);
+			fitFlag = false;
 		}
-		else
+
+		// Display Model - Data dissimilarity
+		displayImagePlane("Model - Data image plane", imagePlane);
+		// Display cube edges
+		displayImagePlane("Canny edges", cubeEdges);
+		//// Display distance transform image
+		//displayImagePlane("Distance Transform of data image", normalise(distTransform));
+		// Display virtual camera parameters
+		dispCamParams(virtualCam);
+#ifdef _COUNT_TIME
+		auto finish = chrono::high_resolution_clock::now();
+		chrono::duration<double> elapsed = finish - start; // Time elapsed between maxIterations
+		cout << "Elapsed time: " << elapsed.count() << " s\n";
+#endif
+		// Keys pressed handler
+		keyboardHandler(virtualCam, model, mNum, defaultParams, exitFlag, updateModelFlag, fitFlag, readFilesFlag, updateFilenamesFlag, videoFlag);
+
+		// Play video
+		if (videoFlag)
 		{
-			// Keys pressed handler
-			keyboardHandler(virtualCam, realCam, model, Data, mNum, defaultParams, exitFlag, updateFlag, fitFlag, demoFlag);
+			playVideo(model, defaultParams, fov, imageWidth, imageHeight, maxIterations, threshold, ratio, kernel);
+			videoFlag = false;
+		}
+
+		// Update filenames
+		if (updateFilenamesFlag)
+		{
+			readFilenames(srcImageFilename, configParamsFilename, modelFilename, configCameraFilename, srcData);
+			updateFilenamesFlag = false;
+		}
+
+		// Update model and parameters
+		if (readFilesFlag)
+		{
+			// Read from .x file
+			float length, height, width;
+			modelData(modelFilename, length, height, width);
+			// Update model dimensions
+			model.setLength(length); model.setHeight(height); model.setWidth(width);
+			// Read camera parameters
+			configCameraData(configCameraFilename, tX, tY, tZ, RX, RY, RZ, fov);
+			// Miscellaneous parameters
+			configParamsData(configParamsFilename, imageWidth, imageHeight, mNum, maxIterations, threshold, ratio, kernel);
+			// Default parameters
+			Vec3f defaultAxisAngle = euler2AxisAngle(deg2rad(RX), deg2rad(RY), deg2rad(RZ));
+			defaultParams = { tX, tY, tZ, defaultAxisAngle.val[0], defaultAxisAngle.val[1], defaultAxisAngle.val[2], static_cast<float>(mNum) };
+			virtualCam.setParams({ defaultParams.begin(), defaultParams.end() - 1 }, state);
+			cout << "Model, camera, image plane and fitting parameters are updated." << endl;
+			readFilesFlag = false;
 		}
 	}
 }
 
 // Read model data from .x file
-void modelData(float &length, float &height, float &width)
+void modelData(string filename, float &length, float &height, float &width)
 {
-	string filename = "cube.x";
 	// Check if input or the file are empty
-	checkFile(filename);
-	ifstream file(filename);
+	string dir = "models/";
+	checkFileModel(dir + filename);
+	ifstream file(dir + filename);
 	
 	// Read Cuboid3D dimensions from .x file
 	string line;
@@ -197,16 +194,236 @@ void modelData(float &length, float &height, float &width)
 	}
 }
 
+// Read from .txt file camera
+void configCameraData(string configFilename, float &tX, float &tY, float &tZ, float &RX, float &RY, float &RZ, float &fov)
+{
+	// Check if input or the file are empty
+	string dir = "config/";
+	string filename = dir + configFilename;
+	checkFileConfig(filename);
+	ifstream file(filename);
+
+	// Read parameters from .txt file
+	string line;
+	while (getline(file, line))
+	{
+		size_t prev = 0;
+		size_t next = 0;
+		vector <String> data;
+
+		while ((next = line.find_first_of(" ", prev)) != string::npos)
+		{
+			if (next - prev != 0)
+			{
+				data.push_back(line.substr(prev, next - prev));
+			}
+			prev = next + 1;
+		}
+		if (prev < line.size())
+		{
+			data.push_back(line.substr(prev));
+		}
+
+		// Extract camera parameters
+		if (!(data[0].compare("TX")))
+		{
+			tX = stof(data[1]);
+		}
+		else if (!(data[0].compare("TY")))
+		{
+			tY = stof(data[1]);
+		}
+		else if (!(data[0].compare("TZ")))
+		{
+			tZ = stof(data[1]);
+		}
+		else if (!(data[0].compare("RX")))
+		{
+			RX = stof(data[1]);
+		}
+		else if (!(data[0].compare("RY")))
+		{
+			RY = stof(data[1]);
+		}
+		else if (!(data[0].compare("RZ")))
+		{
+			RZ = stof(data[1]);
+		}
+		else if (!(data[0].compare("fov")))
+		{
+			fov = stof(data[1]);
+		}
+	}
+}
+
+// Miscellaneous parameters	- image plane, fitting and Canny edge
+void configParamsData(string configParamsFilename, int &imageWidth, int &imageHeight, int &mNum, int &maxIterations, float &threshold, float &ratio, int &kernel)
+{
+	// Check if input or the file are empty
+	string dir = "config/";
+	string filename = dir + configParamsFilename;
+	checkFileConfig(filename);
+	ifstream file(filename);
+
+	// Read parameters from .txt file
+	string line;
+	while (getline(file, line))
+	{
+		size_t prev = 0;
+		size_t next = 0;
+		vector <String> data;
+
+		while ((next = line.find_first_of(" ", prev)) != string::npos)
+		{
+			if (next - prev != 0)
+			{
+				data.push_back(line.substr(prev, next - prev));
+			}
+			prev = next + 1;
+		}
+		if (prev < line.size())
+		{
+			data.push_back(line.substr(prev));
+		}
+
+		if (!(data[0].compare("WIDTH")))
+		{// Image plane parameters
+			imageWidth = stoi(data[1]);
+		}
+		else if (!(data[0].compare("HEIGHT")))
+		{
+			imageHeight = stoi(data[1]);
+		}
+		else if (!(data[0].compare("mNum")))
+		{// Fitting parameters
+			mNum = stoi(data[1]);
+		}
+		else if (!(data[0].compare("maxIterations")))
+		{
+			maxIterations = stoi(data[1]);
+		}
+		if (!(data[0].compare("threshold")))
+		{// Canny edge parameters
+			threshold = stof(data[1]);
+		}
+		if (!(data[0].compare("ratio")))
+		{
+			ratio = stof(data[1]);
+		}
+		if (!(data[0].compare("kernel")))
+		{
+			kernel = stoi(data[1]);
+		}
+	}
+}
+
+// Update filenames
+void readFilenames(string &srcImageFilename, string &configParamsFilename, string &modelFilename, string &configCameraFilename, Mat &srcData)
+{
+	char choice[] = "\0";
+	bool check = false;
+	// Source image filename
+	while (!check)
+	{
+		cout << "Source image file is: " << srcImageFilename << "; do you want to give new file? [Y/N]";
+		cin >> choice;
+		if (!strcmp("Y", choice))
+		{
+			cout << "Give new source image file ";
+			srcImageFilename.clear();
+			cin >> srcImageFilename;
+			srcImageFilename = "data/cuboid2/" + srcImageFilename;
+			srcData = imread(srcImageFilename);
+			check = true;
+		}
+		else if (strcmp("N", choice) != 0)
+		{
+			cout << "Invalid option; Try again." << endl;
+			check = false;
+		}
+		else
+		{
+			check = true;
+		}
+	}
+
+	// Model
+	check = false;
+	while (!check)
+	{
+		cout << "Model file is: " << modelFilename << "; do you want to give a new file? [Y/N]";
+		cin >> choice;
+		if (!strcmp("Y", choice))
+		{
+			cout << "Give new model file ";
+			modelFilename.clear();
+			cin >> modelFilename;
+			check = true;
+		}
+		else if (strcmp("N", choice) != 0)
+		{
+			cout << "Invalid option; Try again." << endl;
+			check = false;
+		}
+		else
+		{
+			check = true;
+		}
+	}
+
+	// Camera parameters
+	check = false;
+	while (!check)
+	{
+		cout << "Camera parameters file is: " << configCameraFilename << "; do you want to give a new file? [Y/N]";
+		cin >> choice;
+		if (!strcmp("Y", choice))
+		{
+			cout << "Give new camera parameters file ";
+			configCameraFilename.clear();
+			cin >> configCameraFilename;
+			check = true;
+		}
+		else if (strcmp("N", choice) != 0)
+		{
+			cout << "Invalid option; Try again." << endl;
+			check = false;
+		}
+		else
+		{
+			check = true;
+		}
+	}
+
+	// Miscellaneous parameters
+	check = false;
+	while (!check)
+	{
+		cout << "Miscellaneous parameters file is: " << configParamsFilename << "; do you want to give a new file? [Y/N]";
+		cin >> choice;
+		if (!strcmp("Y", choice))
+		{
+			cout << "Give new miscellaneous parameters file ";
+			configParamsFilename.clear();
+			cin >> configParamsFilename;
+			check = true;
+		}
+		else if (strcmp("N", choice) != 0)
+		{
+			cout << "Invalid option; Try again." << endl;
+			check = false;
+		}
+		else
+		{
+			check = true;
+		}
+	}
+}
+
 // Render function
-Cuboid2D rendering(Cuboid3D &cuboid3D, Camera &camera, Mat &imagePlane, Mat &imagePlaneObj, string type)
+Cuboid2D rendering(Cuboid3D &cuboid3D, Camera &camera, Mat &imagePlane, Vec3b colour)
 {
 	// Initialization
-	/*Mat img(imagePlane.rows, imagePlane.cols, CV_8UC3, CV_RGB(255, 255, 255));
-	img.copyTo(imagePlaneObj);
-	if (!(type.compare("model")))
-	{
-		img.copyTo(imagePlane);
-	}*/
 	vector <Point3f> homogeneousVertices;
 
 	// Reset visibility
@@ -228,12 +445,7 @@ Cuboid2D rendering(Cuboid3D &cuboid3D, Camera &camera, Mat &imagePlane, Mat &ima
 	visibilityCulling(cuboid3D, objProjection, camera, imagePlane.size());
 
 	// Render object
-	Vec3b colour = Vec3b(0, 255, 0);
-	if (!(type.compare("data")))
-	{
-		colour.val[2] = 255;
-	}
-	drawObj(objProjection, imagePlane, imagePlaneObj, colour, CV_AA);
+	drawObj(objProjection, imagePlane, colour, CV_AA);
 
 	return objProjection;
 }
@@ -247,9 +459,6 @@ void dissimilarity(vector <vector <Point2f>> edgesVertices, Mat &imagePlane, Mat
 	// Construct edges vectors
 	Mat edgesVec = edgesVectors(edgesVertices);
 
-	// Calculate edges normals vectors
-	Mat edgesNormals = edgesNormalVectors(edgesVec);
-
 	// Calculate edges subintervals
 	mijs = edgesSubIntervals(edgesVec, edgesVertices, mNum);
 
@@ -261,13 +470,8 @@ void dissimilarity(vector <vector <Point2f>> edgesVertices, Mat &imagePlane, Mat
 }
 
 // Draw object on image planes
-void drawObj(Cuboid2D objProjection, Mat &imagePlane, Mat &imagePlaneObj, Vec3b colour, int lineType)
+void drawObj(Cuboid2D objProjection, Mat &imagePlane, Vec3b colour, int lineType)
 {
-	if (imagePlane.size() != imagePlaneObj.size())
-	{
-		errorSize("imagePlane", "imagePlaneObj", imagePlane.size(), imagePlaneObj.size(), __FILE__, __LINE__ - 4);
-	}
-
 	for (int i = 0; i < objProjection.getEdgesSize(); i++)
 	{
 		Point2i p1(objProjection.getEdge(i)[0]);
@@ -275,11 +479,8 @@ void drawObj(Cuboid2D objProjection, Mat &imagePlane, Mat &imagePlaneObj, Vec3b 
 		// Draw _VERTICES
 		imagePlane.at<Vec3b>(p1.y, p1.x) = colour;
 		imagePlane.at<Vec3b>(p2.y, p2.x) = colour;
-		imagePlaneObj.at<Vec3b>(p1.y, p1.x) = colour;
-		imagePlaneObj.at<Vec3b>(p2.y, p2.x) = colour;
 		// Draw edges
 		line(imagePlane, p1, p2, colour, 1, lineType, 0);
-		line(imagePlaneObj, p1, p2, colour, 1, lineType, 0);
 	}
 }
 
@@ -419,25 +620,6 @@ bool frontCameraVisibilty(vector <int> surface, vector <Point3f> vertices, Camer
 	return true;
 }
 
-// Fixed time frame update
-Cuboid2D updateFrame(Camera &virtualCam, Camera &realCam, Cuboid3D &model, Cuboid3D &Data, Mat &imagePlane, Mat &imagePlaneModel, Mat &imagePlaneData, Mat &dataImg)
-{
-	// Render model
-	Cuboid2D modelProjection = rendering(model, virtualCam, imagePlane, imagePlaneModel, "model");
-
-	// Render data
-	Cuboid2D dataProjection = rendering(Data, realCam, imagePlane, imagePlaneData, "data");
-
-	// Draw aliassed image
-	dataImg = Mat(dataImg.size(), dataImg.type(), CV_RGB(255, 255, 255));
-	drawObj(dataProjection, dataImg, dataImg, Vec3b(0, 0, 0), 8);
-
-	// Display camera parameters
-	dispCamParams(virtualCam, realCam);
-
-	return modelProjection;
-}
-
 // Create camera
 Camera createCam(Vec3f t, Vec3f r, float fov, int width, int height, vector <State> state)
 {
@@ -462,7 +644,6 @@ void displayImagePlane(string windowName, Mat imagePlane)
 {
 	namedWindow(windowName, WINDOW_AUTOSIZE);
 	imshow(windowName, imagePlane);
-	// waitKey(1);
 }
 
 // Convert 3D _VERTICES and parameters values to Mat, states to enum Parameters and extract intrisincs matrix
@@ -522,22 +703,6 @@ Mat edgesDirectionVectors(vector <vector <Point2f>> edges)
 	}
 
 	return edgesDirection;
-}
-
-// Calculate edges normal unit vectors
-Mat edgesNormalVectors(Mat edgesVec)
-{
-	Mat edgesNormals(edgesVec.rows, 1, CV_32FC2);
-
-	// Calculate normal vector for each edge
-	for (int i = 0; i < edgesNormals.rows; i++)
-	{
-		Vec2f edgeVec = edgesVec.at<Vec2f>(i, 0);
-		Vec2f edgeNormal(-edgeVec.val[1], edgeVec.val[0]);
-		edgesNormals.at<Vec2f>(i, 0) = edgeNormal / norm2(edgeNormal);
-	}
-
-	return edgesNormals;
 }
 
 // Calculate the subintervals mijs for all edges
@@ -601,20 +766,6 @@ void drawMijs(Mat mijs, Mat &imagePlane)
 			circle(imagePlane, mijs.at<Point2f>(i, j), 2, colour, -1, 8);
 		}
 	}
-}
-
-// Compute the distance transform for the data object
-Mat computeDistanceTransform(Mat dataImage)
-{
-	// Create binary data image
-	Mat binaryImage;
-	cvtColor(dataImage, binaryImage, CV_BGR2GRAY);
-	
-	// Calculate distance trasnform
-	Mat distTransform;
-	distanceTransform(binaryImage, distTransform, CV_DIST_L2, 3);
-	
-	return distTransform;
 }
 
 // Convert to display distance transform
@@ -691,13 +842,12 @@ vector <float> fittingGaussNewton(Camera virtualCam, Mat Jdijs, Mat dijs)
 	invert(Jdijs.t() * Jdijs, Jinv); // Pseudo inverse
 	Mat err = Jinv * Jdijs.t() * dijs; // error
 
+	// Convert to euler angles from axis angle
+	// to accumulate the error - axis angle not linear
 	Vec3f eulerAngles = axisAngle2euler(Vec3f(x.at<float>(3, 0), x.at<float>(4, 0), x.at<float>(5, 0)));
 	Vec3f eulerAngles_err = axisAngle2euler(Vec3f(err.at<float>(3, 0), err.at<float>(4, 0), err.at<float>(5, 0)));
 	Vec3f eulerAngles_New = eulerAngles - eulerAngles_err;
 	Vec3f axisAngle = euler2AxisAngle(eulerAngles_New.val[0], eulerAngles_New.val[1], eulerAngles_New.val[2]);
-	/*Mat R1 = axisAngle2Matrix(Vec3f(x.at<float>(3, 0), x.at<float>(4, 0), x.at<float>(5, 0)));
-	Mat R2 = axisAngle2Matrix(Vec3f(err.at<float>(3, 0), err.at<float>(4, 0), err.at<float>(5, 0)));
-	Vec3f axisAngle = matrix2AxisAngle(R2 * R1);*/
 	
 	xNew = x - err; // Remove error from parameters
 	xNew.at<float>(3, 0) = axisAngle.val[0];
@@ -720,51 +870,11 @@ void errorSize(string input1, string input2, T size1, T size2, string filename, 
 	exit(EXIT_FAILURE);
 }
 
-// Demo
-bool demo(Camera &realCam)
-{
-	static int iter = 0;
-	int maxIter = 280;
-	
-	++iter;
-	if (iter == maxIter)
-	{// stop demo
-		iter = 0;
-		return false;
-	}
-	else
-	{// Move realCam
-		
-		vector <float> params = realCam.getParams();
-		Vec3f eulerAngles = axisAngle2euler(Vec3f(params[3], params[4], params[5]));
-		if (iter < (maxIter / 2))
-		{
-			params[0] -= 0.5f;
-		}
-		else
-		{
-			params[0] -= 0.5f;
-			eulerAngles.val[1] -= deg2rad(0.75f);
-			params[1] += 0.25f;
-			eulerAngles.val[2] -= deg2rad(0.25f);
-			params[2] -= 0.25f;
-		}
-		Vec3f axisAngle = euler2AxisAngle(eulerAngles.val[0], eulerAngles.val[1], eulerAngles.val[2]);
-		params[3] = axisAngle.val[0];
-		params[4] = axisAngle.val[1];
-		params[5] = axisAngle.val[2];
-
-		realCam.setParams(params, { X, Y, Z, R1, R2, R3 });
-		
-		return true;
-	}
-}
-
 // Export fitting data
 void exportFittingData(Mat m, Mat x)
 {
 	ofstream out;
-	out.open("data/fitting_data.txt", ofstream::out | ofstream::app);
+	out.open("data/fitting_data.txt", ofstream::out | ofstream::trunc);
 	if (!out.is_open())
 	{
 		cout << "Problem with opening the file." << endl;
@@ -830,7 +940,7 @@ Mat detectEdges(Mat img, double threshold, double ratio, int kernel)
 // Invert binary images
 Mat invertBinaryImage(Mat binaryImg)
 {
-	Mat invertedImg(binaryImg.size(), CV_8UC3);
+	Mat invertedImg(binaryImg.size(), CV_8UC1);
 	for (int i = 0; i < invertedImg.rows; i++)
 	{
 		for (int j = 0; j < invertedImg.cols; j++)
@@ -838,14 +948,98 @@ Mat invertBinaryImage(Mat binaryImg)
 			int pixel = binaryImg.at<uchar>(i, j);
 			if (pixel == 0)
 			{
-				invertedImg.at<Vec3b>(i, j) = Vec3b(255, 255, 255);
+				invertedImg.at<uchar>(i, j) = 255;
 			}
 			else if (pixel == 255)
 			{
-				invertedImg.at<Vec3b>(i, j) = Vec3b(0, 0, 0);
+				invertedImg.at<uchar>(i, j) = 0;
 			}
 		}
 	}
 
 	return invertedImg;
+}
+
+void playVideo(Cuboid3D model, vector <float> params, float fov, int imageWidth, int imageHeight, int maxIterations, float threshold, float ratio, int kernel)
+{
+	// Create a VideoCapture object and open the input file
+	// If the input is the web camera, pass 0 instead of the video file name
+	VideoCapture cap("data/cuboid2/cubeMov4.mp4");
+
+	// Check if camera opened successfully
+	if (!cap.isOpened()) {
+		cout << "Error opening video stream or file" << endl;
+		exit(EXIT_FAILURE);
+	}
+
+	// Virtual camera initialization
+	Camera virtualCam = createCam(Vec3f(params[0], params[1], params[2]), axisAngle2euler(Vec3f(params[3], params[4], params[5])), fov, imageWidth, imageHeight, vector <State> {X, Y, Z, R1, R2, R3});
+	// Model colour
+	Vec3b modelColour(0, 255, 0);
+
+	while (1) 
+	{
+		// Capture frame-by-frame
+		Mat frame;
+		cap >> frame;
+
+		// If the frame is empty, break immediately
+		if (frame.empty())
+			break;
+
+		// Render frame
+		// Resize frame to _HEIGHT and _WIDTH of the image plane of the virtual camera
+		// Image plane WIDTHxHEIGHT pixels
+		Mat imagePlane(Size(imageWidth, imageHeight), CV_8UC3, CV_RGB(255, 255, 255));
+		Mat frameResize;
+		resize(frame, frameResize, Size(imageWidth, imageHeight));
+		frameResize.copyTo(imagePlane);
+				
+		// Detect data object edges
+		Mat cubeEdges = detectEdges(imagePlane, threshold, ratio, kernel);
+		// Invert binary image for distance transform
+		Mat cubeEdgesInv = invertBinaryImage(cubeEdges);
+		// Calculate distance transform of data and it's first derivatives
+		Mat distTransform, dxDist, dyDist;
+		distanceTransform(cubeEdgesInv, distTransform, CV_DIST_L2, 3);
+		distTransformImageGradient(distTransform, dxDist, dyDist);
+
+		// Render model
+		Cuboid2D modelProjection = rendering(model, virtualCam, imagePlane, modelColour);
+		dissimilarity(modelProjection.getEdges(), imagePlane, cubeEdgesInv, distTransform, static_cast<int>(params[6]));
+
+		// Fitting
+		for (int i = 0; i < maxIterations; i++)
+		{
+			// Update model
+			Mat imagePlaneModel(Size(imageWidth, imageHeight), CV_8UC3, CV_RGB(255, 255, 255));
+			Cuboid2D modelProjection = rendering(model, virtualCam, imagePlaneModel, modelColour);
+
+			// Disimillarity between data and model object
+			Mat mijs, dijs;
+			dissimilarity(modelProjection.getEdges(), imagePlaneModel, cubeEdgesInv, distTransform, static_cast<int>(params[6]), mijs, dijs);
+			// Compute first derivatives of 3D homogeneous projection model coordinates
+			// in respect to the state parameters of the camera - extrinsics parameters
+			Mat Jdijs = computeModelFirstDerivatives(model, modelProjection, virtualCam, mijs, dxDist, dyDist);
+			// Use non linear fitting to estimate new parameters for virtual camera
+			vector <float> xNew = fittingGaussNewton(virtualCam, Jdijs, dijs);
+			virtualCam.setParams(xNew, virtualCam.getStates());
+		}
+		// Render frame
+		frameResize.copyTo(imagePlane);
+		// Render model
+		Cuboid2D modelProjectionNew = rendering(model, virtualCam, imagePlane, modelColour);
+		dissimilarity(modelProjectionNew.getEdges(), imagePlane, cubeEdgesInv, distTransform, static_cast<int>(params[6]));
+
+		// Display Model - Data dissimilarity
+		displayImagePlane("Model - Data Video", imagePlane);
+		// Display cube edges
+		displayImagePlane("Canny edges video", cubeEdges);
+		// Display virtual camera parameters
+		dispCamParamsVideo(virtualCam);
+		// Press  ESC on keyboard to exit
+		char c = (char)waitKey(25);
+		if (c == 27)
+			break;
+	}
 }

@@ -34,14 +34,28 @@ void checkIdx(string buffer, int idx, size_t limit)
 	}
 }
 
-// Check if the filename point to a valid .x file
-void checkFile(string filename)
+// Check if the filename points to a valid .x file
+void checkFileModel(string filename)
 {
 	ifstream file(filename);
 
 	if ((!file.is_open()) || (file.peek() == ifstream::traits_type::eof()))
 	{
-		cout << "Provide input images file with .x extension and " << endl;
+		cout << "Provide input model file with .x extension and " << endl;
+		cout << "make sure it's not empty." << endl;
+		system("PAUSE");
+		exit(EXIT_FAILURE);
+	}
+}
+
+// Check if the filename points to a valid .txt file
+void checkFileConfig(string filename)
+{
+	ifstream file(filename);
+
+	if ((!file.is_open()) || (file.peek() == ifstream::traits_type::eof()))
+	{
+		cout << "Provide config file with .txt extension and " << endl;
 		cout << "make sure it's not empty." << endl;
 		system("PAUSE");
 		exit(EXIT_FAILURE);

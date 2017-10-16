@@ -47,8 +47,12 @@ bool IsRotationMatrix(Mat R)
 Vec3f euler2AxisAngle(float thetaX, float thetaY, float thetaZ)
 {
 	// Initialization
-	float cos1 = cos(thetaY / 2.f), cos2 = cos(thetaZ / 2.f), cos3 = cos(thetaX / 2.f);
-	float sin1 = sin(thetaY / 2.f), sin2 = sin(thetaZ / 2.f), sin3 = sin(thetaX / 2.f);
+	// Euler angle order
+	float yaw = thetaY;
+	float pitch = thetaZ;
+	float roll = thetaX;
+	float cos1 = cos(yaw / 2.f), cos2 = cos(pitch / 2.f), cos3 = cos(roll / 2.f);
+	float sin1 = sin(yaw / 2.f), sin2 = sin(pitch / 2.f), sin3 = sin(roll / 2.f);
 
 	// Rotation angle
 	float angle = 2.f * acos(cos1 * cos2 * cos3 - sin1 * sin2 * sin3);
@@ -83,32 +87,32 @@ Vec3f axisAngle2euler(Vec3f axis)
 		return Vec3f();
 	}
 	
-	// Get euler angles in the order tY, tZ, tX
+	// Get euler angles in the order rY, rZ, rX (yaw, pitch, roll)
 	float x = axisAngle.val[0], y = axisAngle.val[1], z = axisAngle.val[2];
 	float sin1 = sin(angle), cos1 = cos(angle), t = 1.f - cos1;
-	float thetaX, thetaY, thetaZ;
+	float yaw, pitch, roll;
 	// Singularites
 	if ((x * y * t + z * sin1) > 0.998f) // Axis straight up
 	{
-		thetaY = 2.f * atan2f(x * sin(angle / 2.f), cos(angle / 2.f));
-		thetaZ = PI / 2.f;
-		thetaX = 0.f;
-		return Vec3f(thetaX, thetaY, thetaZ);
+		yaw = 2.f * atan2f(x * sin(angle / 2.f), cos(angle / 2.f));
+		pitch = PI / 2.f;
+		roll = 0.f;
+		return Vec3f(roll, yaw, pitch);
 	}
 	else if ((x * y * t + z * sin1) < -0.998f) // Axis straight down
 	{
-		thetaY = -2.f * atan2f(x * sin(angle / 2.f), cos(angle / 2.f));
-		thetaZ = -PI / 2.f;
-		thetaX = 0.f;
-		return Vec3f(thetaX, thetaY, thetaZ);
+		yaw = -2.f * atan2f(x * sin(angle / 2.f), cos(angle / 2.f));
+		pitch = -PI / 2.f;
+		roll = 0.f;
+		return Vec3f(roll, yaw, pitch);
 	}
 	
 	// Convert axis angle to euler angles
-	thetaY = atan2f(y * sin1 - x * z * t, 1 - (y * y + z * z) * t);
-	thetaZ = asin(x * y * t + z * sin1);
-	thetaX = atan2f(x * sin1 - y * z * t, 1 - (x * x + z * z) * t);
+	yaw = atan2f(y * sin1 - x * z * t, 1 - (y * y + z * z) * t);
+	pitch = asin(x * y * t + z * sin1);
+	roll = atan2f(x * sin1 - y * z * t, 1 - (x * x + z * z) * t);
 	
-	return Vec3f(thetaX, thetaY, thetaZ);;
+	return Vec3f(roll, yaw, pitch);
 }
 
 // Calculate rotation matrix from axis r which is multiplied
@@ -138,7 +142,6 @@ Mat axisAngle2Matrix(Vec3f axis)
 // Convert rotation matrix to axis angle representation,
 // where the output axis is multiplied by the rotation
 // angle, expressed in radian
-
 Vec3f matrix2AxisAngle(Mat R)
 {
 	float x, y, z, angle;

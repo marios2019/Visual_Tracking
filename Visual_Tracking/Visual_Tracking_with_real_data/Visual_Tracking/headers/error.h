@@ -17,4 +17,7 @@ void errorExit(string err, int limit, ErrCode code);
 void checkIdx(string buffer, int idx, size_t limit);
 
 // Check if the filename point to a valid .x file
-void checkFile(string file);
+void checkFileModel(string file);
+
+// Check if the filename points to a valid .txt file
+void checkFileConfig(string filename);

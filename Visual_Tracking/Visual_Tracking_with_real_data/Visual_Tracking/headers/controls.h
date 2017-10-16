@@ -20,7 +20,10 @@ using namespace std;
 #include "projectiveGeometry.h"
 
 // Dispaly camera parameters
-void dispCamParams(Camera virtualCam, Camera realCam);
+void dispCamParams(Camera virtualCam);
+
+void dispCamParamsVideo(Camera virtualCam);
 
 // Keys pressed handler - case sensitive
-void keyboardHandler(Camera &virtualCam, Camera &realCam, Cuboid3D &model, Cuboid3D &Data, int &mNum, vector <float> defaultParams, bool &exitFlag, bool &updateFlag, bool &fitFlag, bool &demoFlag);
+void keyboardHandler(Camera &virtualCam, Cuboid3D &model, int &mNum, vector <float> defaultParams, bool &exitFlag, bool &updateFlag, bool &fitFlag, 
+				     bool &readFilesFlag, bool &updateFilenamesFlag, bool &videoFlag);

@@ -114,6 +114,15 @@ Mat inverseRotationMatrixDerivative(Mat R, Mat dR);
 Mat imageGradient(Mat Img, PartialDeriv partial);
 
 #ifdef _AXISANGLE
+// Return axis angle matrix derivative
+Mat axisAngleFirstDerivative(Vec3f axisAngle, Parameter xk);
+
+// First derivvative of diagonal elements of axis angle matrix
+float diagonalElementsDerivatives(Vec3f axisAngle, Parameter xk, int elem);
+
+// First derivative of non diagonal elements of axis angle matrix - it's similar to a skew symmetric matrix
+float elementsDerivatives(Vec3f axisAngle, Parameter xk, int row, int col);
+
 // Axis angle rotation matrix partial derivative - first term ([normalised(r)]x * sin(theta))
 Mat axisAngleFirstDerivative_term1(Vec3f axisAngle, Parameter xk);
 
@@ -138,6 +147,9 @@ float sinFirstDerivative(Vec3f v, int vi);
 
 // First derivative of sin(theta), where theta is a function of v
 float cosFirstDerivative(Vec3f v, int vi);
+
+// Return the basis vectors of the 3d space
+Vec3f basis3DVectors(int dim);
 
 // Get 3D rotation representation type
 int rotation3Dtype();
