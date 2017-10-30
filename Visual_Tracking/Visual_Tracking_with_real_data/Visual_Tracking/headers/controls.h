@@ -22,8 +22,12 @@ using namespace std;
 // Dispaly camera parameters
 void dispCamParams(Camera virtualCam);
 
+// Display camera parameters for video
 void dispCamParamsVideo(Camera virtualCam);
+
+// Mouse Handler
+void CallBackFunc(int event, int x, int y, int flags, void* userdata);
 
 // Keys pressed handler - case sensitive
 void keyboardHandler(Camera &virtualCam, Cuboid3D &model, int &mNum, vector <float> defaultParams, bool &exitFlag, bool &updateFlag, bool &fitFlag, 
-				     bool &readFilesFlag, bool &updateFilenamesFlag, bool &videoFlag);
+				     bool &readFilesFlag, bool &updateFilenamesFlag, bool &videoFlag, bool &writeFlag, bool &poseEstimationFlag);

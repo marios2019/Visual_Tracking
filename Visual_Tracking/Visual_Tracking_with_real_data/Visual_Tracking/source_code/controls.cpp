@@ -25,7 +25,7 @@ void dispCamParams(Camera virtualCam)
 	waitKey(1);
 }
 
-// Display camera parameters
+// Display camera parameters for video
 void dispCamParamsVideo(Camera virtualCam)
 {
 	// Attributes
@@ -50,9 +50,19 @@ void dispCamParamsVideo(Camera virtualCam)
 	waitKey(1);
 }
 
+// Mouse Handler
+void CallBackFunc(int event, int x, int y, int flags, void* userdata)
+{
+	// Left click
+	if (event == EVENT_LBUTTONDOWN)
+	{
+		cout << "Left button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
+	}
+}
+
 // Keys pressed handler - case sensitive
 void keyboardHandler(Camera &virtualCam, Cuboid3D &model, int &mNum, vector <float> defaultParams, bool &exitFlag, bool &updateModelFlag, bool &fitFlag, 
-					 bool &readFilesFlag, bool &updateFilenamesFlag, bool &videoFlag)
+					 bool &readFilesFlag, bool &updateFilenamesFlag, bool &videoFlag, bool &writeFlag, bool &poseEstimationFlag)
 {
 	switch (waitKey(0))
 	{
@@ -162,6 +172,16 @@ void keyboardHandler(Camera &virtualCam, Cuboid3D &model, int &mNum, vector <flo
 		{
 			videoFlag = true;
 			updateModelFlag = true;
+			break;
+		}
+		case 102: // 'f' key pressed - write files
+		{
+			writeFlag = true;
+			break;
+		}
+		case 105: // 'i' key pressed - poseEstimation
+		{
+			poseEstimationFlag = true;
 			break;
 		}
 		case 27: // ESC key pressed - exit

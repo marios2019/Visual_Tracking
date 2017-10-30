@@ -38,7 +38,7 @@ void configCameraData(string configFilename, float & tX, float & tY, float & tZ,
 void configParamsData(string configParamsFilename, int & imageWidth, int & imageHeight, int & mNum, int & maxIterations, float & threshold, float & ratio, int & kernel);
 
 // Update filenames
-void readFilenames(string &srcImageFilename, string &configParamsFilename, string & modelFilename, string & configCameraFilename, Mat & srcData);
+void readFilenames(string &srcImageFilename, string &videoFilename, string &configParamsFilename, string & modelFilename, string & configCameraFilename, Mat & srcData);
 
 // Render function
 Cuboid2D rendering(Cuboid3D &cuboid3D, Camera &camera, Mat &imagePlane, Vec3b colour);
@@ -97,6 +97,8 @@ Mat normalise(Mat Img);
 
 // Calculate distance from each mij to data
 Mat calculateDistance(Mat mijs, Mat distTransform);
+// Der Tukey estimator
+float tukeyEstimator(float residual, float threshold);
 
 // Compute distance transform gradient
 void distTransformImageGradient(Mat distTransform, Mat & dxdist, Mat & dydist);
@@ -119,6 +121,6 @@ Mat detectEdges(Mat img, double threshold, double ratio, int kernel);
 
 // Invert binary images
 Mat invertBinaryImage(Mat binaryImg);
-
-
-void playVideo(Cuboid3D model, vector <float> params, float fov, int imageWidth, int imageHeight, int maxIterations, float threshold, float ratio, int kernel);
+			  
+// Play source video and track model
+void playVideo(string videoFilename, Cuboid3D model, vector <float> params, float fov, int imageWidth, int imageHeight, int maxIterations, float threshold, float ratio, int kernel);
