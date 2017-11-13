@@ -1,7 +1,0 @@
-TX -17.f
-TY 45.f
-TZ 34.f
-RX 129.f
-RY -54.5f
-RZ 1.f
-fov 60.f

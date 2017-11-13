@@ -51,18 +51,23 @@ void dispCamParamsVideo(Camera virtualCam)
 }
 
 // Mouse Handler
-void CallBackFunc(int event, int x, int y, int flags, void* userdata)
+void CallBackFunc(int event, int x, int y, int flags, void *inputData)
 {
 	// Left click
 	if (event == EVENT_LBUTTONDOWN)
 	{
-		cout << "Left button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
+		Point2f p;
+		p.x = static_cast<float>(x);
+		p.y = static_cast<float>(y);
+		cout << "Point selected: " << p << endl;
+		vector <Point2f> *points2DMouse = static_cast<vector <Point2f>*>(inputData);
+		points2DMouse->push_back(p);
 	}
 }
 
 // Keys pressed handler - case sensitive
 void keyboardHandler(Camera &virtualCam, Cuboid3D &model, int &mNum, vector <float> defaultParams, bool &exitFlag, bool &updateModelFlag, bool &fitFlag, 
-					 bool &readFilesFlag, bool &updateFilenamesFlag, bool &videoFlag, bool &writeFlag, bool &poseEstimationFlag)
+					 bool &readFilesFlag, bool &updateFilenamesFlag, bool &videoFlag, bool &writeFlag, bool &captureFlag, bool &poseEstimationFlag)
 {
 	switch (waitKey(0))
 	{
@@ -174,14 +179,19 @@ void keyboardHandler(Camera &virtualCam, Cuboid3D &model, int &mNum, vector <flo
 			updateModelFlag = true;
 			break;
 		}
-		case 102: // 'f' key pressed - write files
+		case 102: // 'f' key pressed - write image plane
 		{
-			writeFlag = true;
+			captureFlag = true;
 			break;
 		}
 		case 105: // 'i' key pressed - poseEstimation
 		{
 			poseEstimationFlag = true;
+			break;
+		}
+		case 111: // 'o' key pressed - write camera parameters
+		{
+			writeFlag = true;
 			break;
 		}
 		case 27: // ESC key pressed - exit

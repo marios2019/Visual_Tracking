@@ -1,21 +1,24 @@
 #include "../headers/visualTracking.h"
 
+// Chosen 2D points from image plane, using mouse left click
+vector <Point2f> points2DMouse;
+
 // Visual tracker main function
 void visualTracker(Cuboid3D &model)
 {
 	// Initialization
 	vector <State> state = { X, Y, Z, R1, R2, R3 };
-	float tX, tY, tZ, RX, RY, RZ, fov; // Camera parameters
+	float tX, tY, tZ, RX, RY, RZ, fov = 60.f; // Camera parameters
 	int imageWidth, imageHeight; // Image plane parameters
 	int maxIterations, mNum; // Fitting parameters
 	float threshold, ratio; int kernel; // Canny edge parameters
 	string configParamsFilename = "config_params.txt"; // Miscellaneous parameters
 	string modelFilename = "cube.x";  // 3D model
-	string srcImageFilename = "data/cuboid2/cube2.jpg"; // Source image
-	string videoFilename = "cubeMov2.mp4"; // Source video
+	string srcImageFilename = "data/cuboid2/frame11.jpg"; // Source image
+	string videoFilename = "video11.mp4"; // Source video
 	Mat srcData = imread(srcImageFilename); // Cube image
-	string configCameraFilename = "config_cam.txt";	// Camera parameters
-	configCameraData(configCameraFilename, tX, tY, tZ, RX, RY, RZ, fov); // Read camera parameters
+	string configCameraFilename = "video11.txt";	// Camera parameters
+	configCameraData(configCameraFilename, tX, tY, tZ, RX, RY, RZ); // Read camera parameters
 	configParamsData(configParamsFilename, imageWidth, imageHeight, mNum, maxIterations, threshold, ratio, kernel); // Miscellaneous parameters
 	
 	// Default parameters
@@ -29,7 +32,8 @@ void visualTracker(Cuboid3D &model)
 	bool readFilesFlag = false; // Read again model .x and parameters .txt files
 	bool updateFilenamesFlag = false; // Change filenames
 	bool videoFlag = false; // Fitting on video
-	bool writeFlag = false; // Write data
+	bool writeFlag = false; // Write camera parameters
+	bool captureFlag = false; // Write capture image
 	bool poseEstimationFlag = false; // Pose estimation through corresponding 2D and 3D points
 	
 	// Model colour
@@ -37,7 +41,7 @@ void visualTracker(Cuboid3D &model)
 
 	// Virtual camera initialization
 	Camera virtualCam = createCam(Vec3f(tX, tY, tZ), Vec3f(deg2rad(RX), deg2rad(RY), deg2rad(RZ)), fov, imageWidth, imageHeight, state);
-		
+	
 	// Distance transform and it's first spatial derivatives
 	Mat distTransform, dxDist, dyDist;
 	// Pointer to a Cuboid2D object
@@ -106,11 +110,19 @@ void visualTracker(Cuboid3D &model)
 		}
 
 		// Display Model - Data dissimilarity
-		displayImagePlane("Model - Data image plane", imagePlane);
+		displayImagePlane("Model - Data image plane - " + srcImageFilename, imagePlane);
 		// Display cube edges
 		displayImagePlane("Canny edges", cubeEdges);
+		// Display distance tranform
+		displayImagePlane("Distance Transform", normalise(distTransform));
+		// Display dxDist
+		displayImagePlane("Dx Distance Transform", dxDist);
+		// Display dyDist
+		displayImagePlane("Dy Distance Transform", dyDist);
 		// Display virtual camera parameters
 		dispCamParams(virtualCam);
+		// Set the callback function for left click event
+		setMouseCallback("Model - Data image plane - " + srcImageFilename, CallBackFunc, (void*)&points2DMouse);
 
 #ifdef _COUNT_TIME
 		auto finish = chrono::high_resolution_clock::now();
@@ -118,26 +130,40 @@ void visualTracker(Cuboid3D &model)
 		cout << "Elapsed time: " << elapsed.count() << " s\n";
 #endif
 		// Keys pressed handler
-		keyboardHandler(virtualCam, model, mNum, defaultParams, exitFlag, updateModelFlag, fitFlag, readFilesFlag, updateFilenamesFlag, videoFlag, writeFlag, poseEstimationFlag);
+		keyboardHandler(virtualCam, model, mNum, defaultParams, exitFlag, updateModelFlag, fitFlag, readFilesFlag, updateFilenamesFlag, videoFlag, writeFlag, captureFlag, poseEstimationFlag);
 
 		// Write captured image to disk
-		if (writeFlag)
+		if (captureFlag)
 		{
 			string imageCaptured;
 			cout << "Name of captured image: ";
 			cin >> imageCaptured;
 			imwrite("data/exported_images/" + imageCaptured, imagePlane);
 			cout << "Image saved." << endl;
-			writeFlag = false;
+			captureFlag = false;
 		}
 
+		// Write camera parameters
+		if (writeFlag)
+		{
+			cout << "Name of camera parameters file: ";
+			cin >> configCameraFilename;
+			vector <float> parameters = virtualCam.getParams();
+			writeCamParams(configCameraFilename, parameters);
+			writeFlag = false;
+			readFilesFlag = true;
+		}
 		// Calculate object orientation and translation
 		// from 2D and 3D corresponding points
 		if (poseEstimationFlag)
 		{
-			// Set the callback function for left click event
-			setMouseCallback("Model - Data image plane", CallBackFunc, NULL);
-			//2D_3DPoseEstimation(model.getVertices(), )
+			// Select 2D projected points and their 3D corresponding model points
+			vector <Point3f> modelPoints;
+			vector <Point2f> projectedPoints;
+			get2D_3DCorrespondingPoints(&model.getVertices(), &modelPoints, &projectedPoints);
+			// Estimate position and orientation of the object
+			Mat R; Vec3f t;
+			//poseEstimation2D_3D(&modelPoints, &projectedPoints, &R, &t);
 			poseEstimationFlag = false;
 		}
 
@@ -164,7 +190,7 @@ void visualTracker(Cuboid3D &model)
 			// Update model dimensions
 			model.setLength(length); model.setHeight(height); model.setWidth(width);
 			// Read camera parameters
-			configCameraData(configCameraFilename, tX, tY, tZ, RX, RY, RZ, fov);
+			configCameraData(configCameraFilename, tX, tY, tZ, RX, RY, RZ);
 			// Miscellaneous parameters
 			configParamsData(configParamsFilename, imageWidth, imageHeight, mNum, maxIterations, threshold, ratio, kernel);
 			// Default parameters
@@ -223,7 +249,7 @@ void modelData(string filename, float &length, float &height, float &width)
 }
 
 // Read from .txt file camera
-void configCameraData(string configFilename, float &tX, float &tY, float &tZ, float &RX, float &RY, float &RZ, float &fov)
+void configCameraData(string configFilename, float &tX, float &tY, float &tZ, float &RX, float &RY, float &RZ)
 {
 	// Check if input or the file are empty
 	string dir = "config/";
@@ -276,10 +302,6 @@ void configCameraData(string configFilename, float &tX, float &tY, float &tZ, fl
 		else if (!(data[0].compare("RZ")))
 		{
 			RZ = stof(data[1]);
-		}
-		else if (!(data[0].compare("fov")))
-		{
-			fov = stof(data[1]);
 		}
 	}
 }
@@ -842,45 +864,18 @@ Mat calculateDistance(Mat mijs, Mat distTransform)
 {
 	Mat dijs(mijs.rows * mijs.cols, 1, CV_32FC1);
 	int x, y;
-	float mean = 0.f;
-	vector <float> dataset;
+	// Extract distance from mij to data, using distance transform image
 	for (int j = 0; j < mijs.cols; j++)
 	{
 		for (int i = 0; i < mijs.rows; i++)
 		{
 			x = static_cast<int>(round(mijs.at<Point2f>(i, j).y));
 			y = static_cast<int>(round(mijs.at<Point2f>(i, j).x));
-			dataset.push_back(distTransform.at<float>(x, y));
-			mean += dataset.back();
+			dijs.at<float>((j * mijs.rows) + i, 0) = distTransform.at<float>(x, y);
 		}
 	}
-	mean /= dataset.size();
-	
-	float ssd = 0.f;
-	for (int i = 0; i < dataset.size(); i++)
-	{
-		ssd += pow(dataset[i] - mean, 2.f);
-	}
-	ssd /= (dataset.size() - 1);
-	float standardDeviation = sqrt(ssd);
-	float threshold = 2.f * standardDeviation;
-	for (int i = 0; i < dataset.size(); i++)
-	{
-		dijs.at<float>(i, 0) = tukeyEstimator(dataset[i], threshold);
-		//dijs.at<float>((j * mijs.rows) + i, 0) = residual;
-	}
-	return dijs;
-}
 
-// Der Tukey estimator
-float tukeyEstimator(float residual, float threshold)
-{
-	if (abs(residual) <= threshold)
-	{
-		return ((threshold * threshold) / 6.f) * (1.f - pow((1.f - pow((residual / threshold), 2.f)), 3.f));
-	}
-	
-	return (threshold * threshold) / 6.f;
+	return dijs;
 }
 
 // Compute distance transform gradient
@@ -1058,7 +1053,7 @@ void playVideo(string videoFilename, Cuboid3D model, vector <float> params, floa
 	// Model colour
 	Vec3b modelColour(0, 255, 0);
 
-	/*int count = 0;*/
+	//int count = 0;
 	while (1) 
 	{
 		// Capture frame-by-frame
@@ -1069,14 +1064,14 @@ void playVideo(string videoFilename, Cuboid3D model, vector <float> params, floa
 		if (frame.empty())
 			break;
 
-		/*if (count == 0)
-		{
-			size_t pos = videoFilename.find_last_of(".");
-			string filename = dir + videoFilename.substr(0, pos);
-			filename += "FirstFrame.jpg";
-			imwrite(filename, frame);
-		}
-		++count;*/
+		//if (count == 0)
+		//{
+		//	size_t pos = videoFilename.find_last_of(".");
+		//	string filename = dir + videoFilename.substr(0, pos);
+		//	filename += "FirstFrame.jpg";
+		//	imwrite(filename, frame);
+		//}
+		//++count;
 		
 		// Render frame
 		// Resize frame to _HEIGHT and _WIDTH of the image plane of the virtual camera
@@ -1123,14 +1118,114 @@ void playVideo(string videoFilename, Cuboid3D model, vector <float> params, floa
 		dissimilarity(modelProjectionNew.getEdges(), imagePlane, cubeEdgesInv, distTransform, static_cast<int>(params[6]));
 
 		// Display Model - Data dissimilarity
-		displayImagePlane("Model - Data Video", imagePlane);
+		displayImagePlane("Model - Data Video - " + videoFilename, imagePlane);
 		// Display cube edges
 		displayImagePlane("Canny edges video", cubeEdges);
 		// Display virtual camera parameters
-		dispCamParamsVideo(virtualCam);
+		//dispCamParamsVideo(virtualCam);
 		// Press  ESC on keyboard to exit
-		char c = (char)waitKey(5);
-		if (c == 27)
+		if (waitKey(5) == 27)
 			break;
 	}
+}
+
+// Use mouse to select 2D points and then give their corresponding 3D points
+void get2D_3DCorrespondingPoints(const vector <Point3f> *const modelPoints, vector <Point3f> *const points3D,
+								 vector <Point2f> *const points2D)
+{
+	// Check size of selected 2d points
+	if (points2DMouse.size() != 6)
+	{
+		cout << "You should select 6 2d points from the image plane" << endl;
+		return;
+	}
+	(*points2D) = points2DMouse;
+	points2DMouse.clear();
+	// Choose 6 corresponding 3D model points
+	cout << "Give the order of the 6 corresponding 3D model points:" << endl;
+	cout << "Vertices 0 - " << (*modelPoints).size() - 1 << ": ";
+	while ((*points3D).size() < 6)
+	{
+		unsigned int choice;
+		cin >> choice;
+		if (choice < static_cast<int>((*modelPoints).size()))
+		{
+			(*points3D).push_back((*modelPoints)[choice]);
+		}
+		else
+		{
+			cout << "The cube has only 8 vertices, choose again." << endl;
+		}
+	}
+	
+	cout << "Chosen 2D - 3D corresponding points: ";
+	for (size_t i = 0; i < (*points2D).size(); i++)
+	{
+		cout << "\n" << (*points2D)[i] << " --> " << (*points3D)[i];
+	}
+	cout << endl;
+}
+
+// Write camera parameters to file
+void writeCamParams(string filename, vector <float> parameters)
+{
+	// Check parameters size
+	if (static_cast<int>(parameters.size()) != 6)
+	{
+		cout << "There should be 6 camera parameters." << endl;
+		return;
+	}
+
+	// Open file
+	ofstream out;
+	string path = "config/";
+	out.open(path + filename, ofstream::out | ofstream::trunc);
+	if (!out.is_open())
+	{
+		cout << "Problem with opening the file." << endl;
+		return;
+	}
+
+	// Axis angle to euler angles
+	Vec3f eulerAngles = axisAngle2euler(Vec3f(parameters[3], parameters[4], parameters[5]));
+	parameters[3] = rad2deg(eulerAngles.val[0]);
+	parameters[4] = rad2deg(eulerAngles.val[1]);
+	parameters[5] = rad2deg(eulerAngles.val[2]);
+
+	string s;
+	for (int i = 0; i < static_cast<int>(parameters.size()); i++)
+	{
+		ostringstream convert1;
+		switch (i)
+		{
+			case 0:
+				s += "TX ";
+				break;
+			case 1:
+				s += "TY ";
+				break;
+			case 2:
+				s += "TZ ";
+				break;
+			case 3:
+				s += "RX ";
+				break;
+			case 4:
+				s += "RY ";
+				break;
+			case 5:
+				s += "RZ ";
+				break;
+			default:
+				break;
+		}
+		convert1 << parameters[i];
+		s += convert1.str();
+		s += "\n";
+
+	}
+
+	out << s;
+	out.flush();
+	out.close();
 }

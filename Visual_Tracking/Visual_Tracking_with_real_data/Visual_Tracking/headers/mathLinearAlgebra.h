@@ -151,5 +151,10 @@ float cosFirstDerivative(Vec3f v, int vi);
 // Return the basis vectors of the 3d space
 Vec3f basis3DVectors(int dim);
 
+// Calculate pose of the object, through 2D projected points
+// and their corresponding 3D model points
+void poseEstimation2D_3D(const vector <Point3f> *const modelPoints, const vector <Point2f> *const projectedPoints, Mat K,
+						 Mat *const R, Vec3f *const t);
+
 // Get 3D rotation representation type
 int rotation3Dtype();

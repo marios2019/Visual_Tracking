@@ -430,49 +430,14 @@ Mat inverseRotationMatrixDerivative(Mat R, Mat dR)
 Mat imageGradient(Mat Img, PartialDeriv partial)
 {
 	Mat dImg = Mat(Img.size(), CV_32F);
-	Mat kernel = (Mat_<float>(1, 2) << -1.f, 1.f);
-	int i = 0, j = 0, dx = 0, dy = 0, *ix, *iy, height = Img.rows, width = Img.cols, iRange, jRange;
-
-	// Choose partial derivative's direction - dimension
-	switch (partial)
+	// Choose derivative
+	if (partial == Dx)
 	{
-		case Dx: // Horizontal direction
-		{
-			ix = &j;
-			iy = &i;
-			dx = 1;
-			Mat column = Img.col(Img.cols - 1);
-			hconcat(Img, column, Img); // Image padding with an extra column
-			jRange = Img.cols - 1;
-			iRange = Img.rows;
-			break;
-		}
-		case Dy: // Vertical direction
-		{
-			ix = &i;
-			iy = &j;
-			dy = 1;
-			Mat row = Img.row(Img.rows - 1); // Image padding with an extra row
-			Img.push_back(row);
-			jRange = Img.rows - 1;
-			iRange = Img.cols;
-			break;
-		}
-		default:
-		{
-			cout << "The two independent variables are x and y; available partial derivatives are dx and dy." << endl;
-			system("PAUSE");
-			exit(EXIT_FAILURE);
-		}
+		Sobel(Img, dImg, CV_32F, 1, 0, 3, 1, 0);
 	}
-
-	// Convolution of img with the derivative kernel
-	for (i = 0 ; i < iRange; i++)
+	else
 	{
-		for (j = 0 ; j < jRange; j++)
-		{
-			dImg.at<float>(*iy, *ix) = Img.at<float>(*iy, *ix) * kernel.at<float>(0, 0) + Img.at<float>(*iy + dy, *ix + dx) * kernel.at<float>(0, 1);
-		}
+		Sobel(Img, dImg, CV_32F, 0, 1, 3, 1, 0);
 	}
 
 	return dImg;
@@ -763,6 +728,24 @@ Vec3f basis3DVectors(int dim)
 	Mat I = Mat::eye(3, 3, CV_32F);
 
 	return I.at<Vec3f>(dim, 0);
+}
+
+// Calculate pose of the object, through 2D projected points
+// and their corresponding 3D model points
+void poseEstimation2D_3D(const vector <Point3f> *const xw, const vector <Point2f> *const xp, Mat K, 
+						 Mat * const R, Vec3f * const t)
+{
+	Mat A, b;
+	float f = K.at<float>(0, 0);
+	float u0 = K.at<float>(0, 2), v0 = K.at<float>(1, 2);
+	for (size_t i = 0; i < (*xw).size(); i++)
+	{
+		Mat rowXp = (Mat_<float>(1, 12) << f * (*xw)[i].x, f * (*xw)[i].y, f * (*xw)[i].z, 0.f, 0.f, 0.f,
+			u0 * (*xw)[i].x - (*xw)[i].x * (*xp)[i].x, u0 * (*xw)[i].y - (*xw)[i].y * (*xp)[i].x,
+			u0 * (*xw)[i].z - (*xw)[i].z * (*xp)[i].x, f, 0.f, u0);
+									
+	}
+
 }
 
 // Get 3D rotation representation type

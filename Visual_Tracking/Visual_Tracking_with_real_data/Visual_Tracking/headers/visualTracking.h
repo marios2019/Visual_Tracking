@@ -32,7 +32,7 @@ void visualTracker(Cuboid3D &model);
 void modelData(string filename, float &length, float &height, float &width);
 
 // Read from .txt file camera parameters
-void configCameraData(string configFilename, float & tX, float & tY, float & tZ, float & RX, float & RY, float & RZ, float & fov);
+void configCameraData(string configFilename, float & tX, float & tY, float & tZ, float & RX, float & RY, float & RZ);
 
 // Miscellaneous parameters	- image plane, fitting and Canny edge
 void configParamsData(string configParamsFilename, int & imageWidth, int & imageHeight, int & mNum, int & maxIterations, float & threshold, float & ratio, int & kernel);
@@ -97,8 +97,6 @@ Mat normalise(Mat Img);
 
 // Calculate distance from each mij to data
 Mat calculateDistance(Mat mijs, Mat distTransform);
-// Der Tukey estimator
-float tukeyEstimator(float residual, float threshold);
 
 // Compute distance transform gradient
 void distTransformImageGradient(Mat distTransform, Mat & dxdist, Mat & dydist);
@@ -124,3 +122,9 @@ Mat invertBinaryImage(Mat binaryImg);
 			  
 // Play source video and track model
 void playVideo(string videoFilename, Cuboid3D model, vector <float> params, float fov, int imageWidth, int imageHeight, int maxIterations, float threshold, float ratio, int kernel);
+
+// Use mouse to select 2D points and then give their corresponding 3D points
+void get2D_3DCorrespondingPoints(const vector <Point3f> *const modelPoints, vector <Point3f> *const points3D, vector <Point2f> *const points2D);
+
+// Write camera parameters to file
+void writeCamParams(string filename, vector<float> parameters);

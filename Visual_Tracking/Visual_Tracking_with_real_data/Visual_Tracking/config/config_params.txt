@@ -1,7 +1,7 @@
 WIDTH 400
 HEIGHT 300
-mNum 11
-maxIterations 10
-threshold 8.f
+mNum 5
+maxIterations 15
+threshold 10.f
 ratio 3.f
 kernel 3
