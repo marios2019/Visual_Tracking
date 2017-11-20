@@ -160,36 +160,36 @@ void keyboardHandler(Camera &virtualCam, Cuboid3D &model, int &mNum, vector <flo
 			updateModelFlag = true;
 			break;
 		}
-		case 114: // 'r' key pressed - read files
+		case 82: // 'R' key pressed - read files
 		{
 			readFilesFlag = true;
 			updateModelFlag = true;
 			break;
 		}
-		case 108: // 'l' key pressed - read files
+		case 76: // 'L' key pressed - read filenames
 		{
 			updateFilenamesFlag = true;
 			readFilesFlag = true;
 			updateModelFlag = true;
 			break;
 		}
-		case 112: // 'p' key pressed - read files
+		case 80: // 'p' key pressed - play video
 		{
 			videoFlag = true;
 			updateModelFlag = true;
 			break;
 		}
-		case 102: // 'f' key pressed - write image plane
+		case 70: // 'F' key pressed - write image plane
 		{
 			captureFlag = true;
 			break;
 		}
-		case 105: // 'i' key pressed - poseEstimation
+		case 73: // 'I' key pressed - poseEstimation
 		{
 			poseEstimationFlag = true;
 			break;
 		}
-		case 111: // 'o' key pressed - write camera parameters
+		case 79: // 'O' key pressed - write camera parameters
 		{
 			writeFlag = true;
 			break;

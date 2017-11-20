@@ -23,7 +23,9 @@ using namespace std;
 #include "mathLinearAlgebra.h"
 #include "controls.h"
 
-#define _COUNT_TIME
+//#define _COUNT_TIME
+//#define _DEBUG
+//#define _CAP_FIRST_FRAME
 
 // Visual tracker main function
 void visualTracker(Cuboid3D &model);

@@ -35,7 +35,7 @@ void checkIdx(string buffer, int idx, size_t limit)
 }
 
 // Check if the filename points to a valid .x file
-void checkFileModel(string filename)
+bool checkFileModel(string filename)
 {
 	ifstream file(filename);
 
@@ -43,13 +43,14 @@ void checkFileModel(string filename)
 	{
 		cout << "Provide input model file with .x extension and " << endl;
 		cout << "make sure it's not empty." << endl;
-		system("PAUSE");
-		exit(EXIT_FAILURE);
+		return false;
 	}
+
+	return true;
 }
 
 // Check if the filename points to a valid .txt file
-void checkFileConfig(string filename)
+bool checkFileConfig(string filename)
 {
 	ifstream file(filename);
 
@@ -57,7 +58,8 @@ void checkFileConfig(string filename)
 	{
 		cout << "Provide config file with .txt extension and " << endl;
 		cout << "make sure it's not empty." << endl;
-		system("PAUSE");
-		exit(EXIT_FAILURE);
+		return false;
 	}
+
+	return true;
 }

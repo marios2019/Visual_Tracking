@@ -1,0 +1,6 @@
+TX -20.f
+TY 46.f
+TZ 36.f
+RX 122.f
+RY -43.5f
+RZ 0.f
