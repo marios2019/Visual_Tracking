@@ -1,3 +1,13 @@
-﻿  mathLinearAlgebra.cpp
-  Visual_Tracking.vcxproj -> D:\MegaSync\ΜΕΠ\GitHub Repos\Visual_Tracking\Visual_Tracking\x64\Debug\Visual_Tracking.exe
-  Visual_Tracking.vcxproj -> D:\MegaSync\ΜΕΠ\GitHub Repos\Visual_Tracking\Visual_Tracking\x64\Debug\Visual_Tracking.pdb (Full PDB)
+﻿  visualTracking.cpp
+  Source.cpp
+  rotations3D.cpp
+  mathLinearAlgebra.cpp
+  error.cpp
+  controls.cpp
+  Cuboid3D.cpp
+  Cuboid2D.cpp
+  CameraStateSpace.cpp
+  Camera.cpp
+  Generating Code...
+  Visual_Tracking.vcxproj -> C:\Users\marios\Documents\MEGAsync\ΜΕΠ\Visual Tracking\Visual_Tracking\x64\Debug\Visual_Tracking.exe
+  Visual_Tracking.vcxproj -> C:\Users\marios\Documents\MEGAsync\ΜΕΠ\Visual Tracking\Visual_Tracking\x64\Debug\Visual_Tracking.pdb (Full PDB)

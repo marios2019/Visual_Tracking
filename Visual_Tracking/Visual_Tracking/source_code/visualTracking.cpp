@@ -8,7 +8,7 @@ void visualTracker(Cuboid3D &model, Cuboid3D &Data, int width, int height)
 	float fov = 60.f;
 	Vec3f defaultAxisAngle = euler2AxisAngle(deg2rad(_RX), deg2rad(_RY), deg2rad(_RZ));
 	vector <float> defaultParams = { _TX, _TY, _TZ, defaultAxisAngle.val[0], defaultAxisAngle.val[1], defaultAxisAngle.val[2], _MNUM };
-	int maxIterations = 10; // Number of non linear fitting iterations
+	int maxIterations = 5; // Number of non linear fitting iterations
 	bool exitFlag = false; // If true, exit application
 	bool updateFlag = true; // If true render again cuboids
 	bool fitFlag = false; // If true start non linear fitting
@@ -42,7 +42,6 @@ void visualTracker(Cuboid3D &model, Cuboid3D &Data, int width, int height)
 	{
 		// Render model
 		modelProjection = new Cuboid2D(rendering(model, virtualCam, imagePlane, imagePlaneModel, "model"));
-		//Cuboid2D modelProjection = rendering(model, virtualCam, imagePlane, imagePlaneModel, "model");
 		// Render data
 		Cuboid2D dataProjection = rendering(Data, realCam, imagePlane, imagePlaneData, "data");
 		if (updateFlag) // Update image plane
@@ -51,21 +50,74 @@ void visualTracker(Cuboid3D &model, Cuboid3D &Data, int width, int height)
 			// Draw aliassed image
 			dataImage = Mat(imagePlaneData.size(), dataImage.type(), CV_RGB(255, 255, 255));
 			drawObj(dataProjection, dataImage, dataImage, Vec3b(0, 0, 0), 8);
+
+#ifdef _SHOW_CAM_PARAMS
 			// Display camera parameters
 			dispCamParams(virtualCam, realCam);
+#endif // _SHOW_CAM_PARAMS
 
 			// Calculate distance transform of data and it's first derivatives
 			distTransform = computeDistanceTransform(dataImage);
 			distTransformImageGradient(distTransform, dxDist, dyDist);
 			// Display distance transform image
 			displayImagePlane("Distance Transform of data image", normalise(distTransform));
+
+#ifdef _EXPORT_DT
+			vector <int> png_params1 = { CV_IMWRITE_PNG_COMPRESSION, 0 };
+			Mat dt = normalise(distTransform);
+			Mat img1(height, width, CV_8UC3, CV_RGB(255, 255, 255));
+			drawObj(*modelProjection, dt, img1, Vec3b(0, 0, 0), CV_AA);
+			// Disimillarity between data and model object
+			Mat mijs1, dijs1;
+			dissimilarity(modelProjection->getEdges(), dt, dataImage, distTransform, mNum, mijs1, dijs1);
+			displayImagePlane("", dt);
+			string imgname1 = "data/exported_images/dt_cube";
+			imgname1 += ".png";
+			imwrite(imgname1, 255.f* dt, png_params1);
+#endif // _EXPORT_DT
+
 		}
+
+#ifdef _EXPORT_RENDER
+		vector <int> png_params = { CV_IMWRITE_PNG_COMPRESSION, 0 };
+		imwrite("data/exported_images/impose.png", imagePlane, png_params);
+#endif // _EXPORT_RENDER
+
 
 		// Disimillarity between data and model object
 		Mat mijs, dijs;
 		dissimilarity(modelProjection->getEdges(), imagePlane, dataImage, distTransform, mNum, mijs, dijs);
 		// Display Model - Data dissimilarity
 		displayImagePlane("Model - Data image plane", imagePlane);
+
+#ifdef _EXPORT_RENDER
+		imwrite("data/exported_images/render.png", imagePlaneModel, png_params);
+		imwrite("data/exported_images/source.png", imagePlaneData, png_params);
+		Mat img;
+		imagePlaneModel.copyTo(img);
+		dissimilarity(modelProjection->getEdges(), img, dataImage, distTransform, mNum, mijs, dijs);
+		imwrite("data/exported_images/mij.png", img, png_params);
+#endif // _EXPORT_RENDER
+
+
+#ifdef _EXPORT_IMAGES
+		Size rsize(400, 300);
+		vector <int> png_params = { CV_IMWRITE_PNG_COMPRESSION, 0 };
+		Mat img;
+		imagePlane.convertTo(img, CV_16U, 255);
+		resize(img, img, rsize);
+		imwrite("data/exported_images/img_start.png", img, png_params);
+		Mat d;
+		distTransform.convertTo(d, CV_16U,  255);
+		resize(d, d, rsize);
+		imwrite("data/exported_images/dist.png", d, png_params);
+		Mat dx, dy;
+		resize(dxDist, dx, rsize);
+		resize(dyDist, dy, rsize);
+		imwrite("data/exported_images/dx_dist.png", 255.0 * dx, png_params);
+		imwrite("data/exported_images/dy_dist.png", 255.0 * dy, png_params);
+#endif // _EXPORT_IMAGES
+
 		
 
 		if (fitFlag) // Fit model to data
@@ -97,6 +149,17 @@ void visualTracker(Cuboid3D &model, Cuboid3D &Data, int width, int height)
 				// Use non linear fitting to estimate new parameters for virtual camera
 				vector <float> xNew = fittingGaussNewton(virtualCam, Jdijs, dijs);
 				virtualCam.setParams(xNew, virtualCam.getStates());
+
+#ifdef _EXPORT_IMAGES
+				rendering(Data, realCam, imagePlane, imagePlaneData, "data");
+				imagePlane.convertTo(img, CV_16U, 255);
+				resize(img, img, rsize);
+				string imgname = "data/exported_images/img" + to_string(i);
+				imgname += ".png";
+				imwrite(imgname, img, png_params);
+#endif // _EXPORT_IMAGES
+
+
 #ifdef _LOG
 				x.push_back(convertSTLvector2Mat(virtualCam.getParams(), static_cast<int>(virtualCam.getParams().size()), 1, CV_32F).t());
 #endif
@@ -122,6 +185,15 @@ void visualTracker(Cuboid3D &model, Cuboid3D &Data, int width, int height)
 			exportFittingData(err, x);
 			err.release();
 			x.release();
+
+#ifdef _EXPORT_IMAGES
+			rendering(Data, realCam, imagePlane, imagePlaneData, "data");
+			imagePlane.convertTo(img, CV_16U, 255);
+			resize(img, img, rsize);
+			string imgname = "data/exported_images/img_final.png";
+			imwrite(imgname, img, png_params);
+#endif // _EXPORT_IMAGES
+			
 #endif
 
 #ifdef _DEMO
@@ -262,10 +334,12 @@ void drawObj(Cuboid2D objProjection, Mat &imagePlane, Mat &imagePlaneObj, Vec3b 
 		Point2i p1(objProjection.getEdge(i)[0]);
 		Point2i p2(objProjection.getEdge(i)[1]);
 		// Draw _VERTICES
+#ifndef _EXPORT_DT
 		imagePlane.at<Vec3b>(p1.y, p1.x) = colour;
 		imagePlane.at<Vec3b>(p2.y, p2.x) = colour;
 		imagePlaneObj.at<Vec3b>(p1.y, p1.x) = colour;
 		imagePlaneObj.at<Vec3b>(p2.y, p2.x) = colour;
+#endif
 		// Draw edges
 		line(imagePlane, p1, p2, colour, 1, lineType, 0);
 		line(imagePlaneObj, p1, p2, colour, 1, lineType, 0);
@@ -451,7 +525,7 @@ void displayImagePlane(string windowName, Mat imagePlane)
 {
 	namedWindow(windowName, WINDOW_AUTOSIZE);
 	imshow(windowName, imagePlane);
-	// waitKey(1);
+	waitKey(1);
 }
 
 // Convert 3D _VERTICES and parameters values to Mat, states to enum Parameters and extract intrisincs matrix
@@ -598,7 +672,11 @@ Mat computeDistanceTransform(Mat dataImage)
 	// Create binary data image
 	Mat binaryImage;
 	cvtColor(dataImage, binaryImage, CV_BGR2GRAY);
-	
+
+#ifdef _EXPORT_IMAGES
+	imwrite("data/exported_images/binary_image.png", binaryImage, { CV_IMWRITE_PNG_COMPRESSION, 0 });
+#endif // _EXPORT_IMAGES
+																									 
 	// Calculate distance trasnform
 	Mat distTransform;
 	distanceTransform(binaryImage, distTransform, CV_DIST_L2, 3);
@@ -750,7 +828,7 @@ bool demo(Camera &realCam)
 void exportFittingData(Mat m, Mat x)
 {
 	ofstream out;
-	out.open("data/fitting_data.txt", ofstream::out | ofstream::app);
+	out.open("data/fitting_data.txt", ofstream::out | ofstream::trunc);
 	if (!out.is_open())
 	{
 		cout << "Problem with opening the file." << endl;
@@ -768,7 +846,15 @@ void exportFittingData(Mat m, Mat x)
 			for (int j = 0; j < x.cols; j++)
 			{
 				ostringstream convert2;
-				convert2 << x.at<float>(i, j);
+				if (j < 3)
+				{
+					convert2 << x.at<float>(i, j);
+				}
+				else
+				{
+					Vec3f eulerAngles = axisAngle2euler(Vec3f(x.at<float>(i, 3), x.at<float>(i, 4), x.at<float>(i, 5)));
+					convert2 << rad2deg(eulerAngles.val[j-3]);
+				}
 				sX += convert2.str();
 				if (j < (x.cols - 1))
 				{

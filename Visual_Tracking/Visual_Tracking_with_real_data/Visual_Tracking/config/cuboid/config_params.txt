@@ -1,0 +1,8 @@
+WIDTH 533
+HEIGHT 300
+fov 48.5f
+mNum 11
+maxIterations 10
+threshold 10.f
+ratio 3.f
+kernel 3

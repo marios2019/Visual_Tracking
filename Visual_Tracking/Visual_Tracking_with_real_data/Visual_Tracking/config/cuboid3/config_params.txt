@@ -1,7 +1,0 @@
-WIDTH 531
-HEIGHT 300
-mNum 11
-maxIterations 5
-threshold 10.f
-ratio 3.f
-kernel 3

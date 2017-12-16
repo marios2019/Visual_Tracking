@@ -152,6 +152,7 @@
     <ClCompile Include="class_definitions\Cuboid3D.cpp" />
     <ClCompile Include="source_code\controls.cpp" />
     <ClCompile Include="source_code\error.cpp" />
+    <ClCompile Include="source_code\io.cpp" />
     <ClCompile Include="source_code\mathLinearAlgebra.cpp" />
     <ClCompile Include="source_code\rotations3D.cpp" />
     <ClCompile Include="source_code\Source.cpp" />
@@ -162,6 +163,7 @@
     <ClInclude Include="headers\controls.h" />
     <ClInclude Include="headers\Cuboid2D.h" />
     <ClInclude Include="headers\error.h" />
+    <ClInclude Include="headers\io.h" />
     <ClInclude Include="headers\mathLinearAlgebra.h" />
     <ClInclude Include="headers\projectiveGeometry.h" />
     <ClInclude Include="headers\cameraCalibration.h" />

@@ -3,27 +3,23 @@
 // Chosen 2D points from image plane, using mouse left click
 vector <Point2f> points2DMouse;
 
-string _VIDEO_DIR = "data/cuboid3/";
-string _CONFIG_DIR = "config/cuboid3/";
-string _MODEL_DIR = "models/";
-
 // Visual tracker main function
 void visualTracker(Cuboid3D &model)
 {
 	// Initialization
 	vector <State> state = { X, Y, Z, R1, R2, R3 };
-	float tX, tY, tZ, RX, RY, RZ, fov = 62.3f; // Camera parameters
+	float tX, tY, tZ, RX, RY, RZ, fov; // Camera parameters
 	int imageWidth, imageHeight; // Image plane parameters
 	int maxIterations, mNum; // Fitting parameters
 	float threshold, ratio; int kernel; // Canny edge parameters
-	string configParamsFilename = "config_params.txt"; // Miscellaneous parameters
-	string modelFilename = "cuboid3.x";  // 3D model
-	string srcImageFilename = "frame15.jpg"; // Source image
-	string videoFilename = "video15.mp4"; // Source video
-	Mat srcData = imread(_VIDEO_DIR + srcImageFilename); // Cube image
-	string configCameraFilename = "video15.txt";	// Camera parameters
+	string configParamsFilename = _CONFIG_DIR + "config_params.txt"; // Miscellaneous parameters
+	string modelFilename = _MODEL_DIR + "cuboid.x";  // 3D model
+	string srcImageFilename = _VIDEO_DIR + "frame1.jpg"; // Source image
+	string videoFilename = _VIDEO_DIR + "video1.mp4"; // Source video
+	Mat srcData = imread(srcImageFilename); // Cube image
+	string configCameraFilename = _CONFIG_DIR + "cam1.txt";	// Camera parameters
 	configCameraData(configCameraFilename, tX, tY, tZ, RX, RY, RZ); // Read camera parameters
-	configParamsData(configParamsFilename, imageWidth, imageHeight, mNum, maxIterations, threshold, ratio, kernel); // Miscellaneous parameters
+	configParamsData(configParamsFilename, imageWidth, imageHeight, fov, mNum, maxIterations, threshold, ratio, kernel); // Miscellaneous parameters
 	
 	// Default parameters
 	Vec3f defaultAxisAngle = euler2AxisAngle(deg2rad(RX), deg2rad(RY), deg2rad(RZ));
@@ -74,15 +70,29 @@ void visualTracker(Cuboid3D &model)
 		cubeEdgesInv.release();
 		cubeEdgesInv = invertBinaryImage(cubeEdges);
 		// Calculate distance transform of data and it's first derivatives
-		distanceTransform(cubeEdgesInv, distTransform, CV_DIST_L2, 3);
+		distanceTransform(cubeEdgesInv, distTransform, CV_DIST_L2, 5);
 		distTransformImageGradient(distTransform, dxDist, dyDist);
 		
 		if (updateModelFlag) // Update model
 		{
 			// Render model
 			modelProjection = new Cuboid2D(rendering(model, virtualCam, imagePlane, modelColour));
+#ifdef _EXPORT_RENDER
+			vector <int> png_params = { CV_IMWRITE_PNG_COMPRESSION, 0 };
+			imwrite("data/exported_images/impose.png", imagePlane, png_params);
+#endif // _EXPORT_RENDER
+
 			// Disimillarity between data and model object
 			dissimilarity(modelProjection->getEdges(), imagePlane, cubeEdgesInv, distTransform, mNum);
+#ifdef _EXPORT_RENDER
+			Mat	img(Size(imageWidth, imageHeight), CV_8UC3, CV_RGB(255, 255, 255));
+			rendering(model, virtualCam, img, modelColour);
+			imwrite("data/exported_images/render.png", img, png_params);
+			dissimilarity(modelProjection->getEdges(), img, cubeEdgesInv, distTransform, mNum);
+			imwrite("data/exported_images/mij.png", img, png_params);
+			imwrite("data/exported_images/source.png", cube, png_params);
+#endif // _EXPORT_RENDER
+
 		}		  	
 
 		if (fitFlag) // Fit model to data
@@ -131,6 +141,18 @@ void visualTracker(Cuboid3D &model)
 		setMouseCallback("Model - Data image plane - " + srcImageFilename, CallBackFunc, (void*)&points2DMouse);
 #endif // _DEBUG
 
+#ifdef _EXPORT_IMAGES
+		string dirExport = "data/exported_images/";
+		vector <int> png_params = { CV_IMWRITE_PNG_COMPRESSION, 0 };
+		imwrite(dirExport + "img.png", imagePlane, png_params);
+		imwrite(dirExport + "canny.png", cubeEdges, png_params);
+		imwrite(dirExport + "dist.png", distTransform, png_params);
+		imwrite(dirExport + "dx_dist.png", 255.f * dxDist, png_params);
+		imwrite(dirExport + "dy_dist.png", 255.f * dyDist, png_params);
+		imwrite(dirExport + "binary_image.png", cubeEdgesInv, png_params);
+#endif // _EXPORT_IMAGES
+
+
 #ifdef _COUNT_TIME
 		auto finish = chrono::high_resolution_clock::now();
 		chrono::duration<double> elapsed = finish - start; // Time elapsed between maxIterations
@@ -157,6 +179,7 @@ void visualTracker(Cuboid3D &model)
 			cout << "Name of camera parameters file: ";
 			cin >> configCameraFilename;
 			vector <float> parameters = virtualCam.getParams();
+			configCameraFilename = _CONFIG_DIR + configCameraFilename;
 			writeCamParams(configCameraFilename, parameters);
 			writeFlag = false;
 			readFilesFlag = true;
@@ -200,358 +223,16 @@ void visualTracker(Cuboid3D &model)
 			// Read camera parameters
 			configCameraData(configCameraFilename, tX, tY, tZ, RX, RY, RZ);
 			// Miscellaneous parameters
-			configParamsData(configParamsFilename, imageWidth, imageHeight, mNum, maxIterations, threshold, ratio, kernel);
+			configParamsData(configParamsFilename, imageWidth, imageHeight, fov, mNum, maxIterations, threshold, ratio, kernel);
 			// Default parameters
 			Vec3f defaultAxisAngle = euler2AxisAngle(deg2rad(RX), deg2rad(RY), deg2rad(RZ));
 			defaultParams = { tX, tY, tZ, defaultAxisAngle.val[0], defaultAxisAngle.val[1], defaultAxisAngle.val[2], static_cast<float>(mNum) };
+			// Update camera parameters
 			virtualCam.setParams({ defaultParams.begin(), defaultParams.end() - 1 }, state);
-			cout << "Model, camera, image plane and fitting parameters are updated." << endl;
+			float u0 = static_cast<float>(width) / 2.f, v0 = static_cast<float>(height) / 2.f; // Principal point - center of image plane
+			cout << "Model, camera, image plane, video stream and fitting parameters are updated." << endl;
 			destroyAllWindows();
 			readFilesFlag = false;
-		}
-	}
-}
-
-// Read model data from .x file
-void modelData(string filename, float &length, float &height, float &width)
-{
-	// Check if input or the file are empty
-	string dir = _MODEL_DIR;
-	if (!checkFileModel(dir + filename))
-	{
-		return;
-	}
-	ifstream file(dir + filename);
-	
-	// Read Cuboid3D dimensions from .x file
-	string line;
-	while (getline(file, line))
-	{
-		size_t prev = 0;
-		size_t next = 0;
-		vector <String> data;
-
-		while ((next = line.find_first_of(" ", prev)) != string::npos)
-		{
-			if (next - prev != 0)
-			{
-				data.push_back(line.substr(prev, next - prev));
-			}
-			prev = next + 1;
-		}
-		if (prev < line.size())
-		{
-			data.push_back(line.substr(prev));
-		}
-
-		// Extract 3D cuboid dimensions
-		if (!(data[0].compare("length")))
-		{
-			length = stof(data[1]);
-		}
-		else if (!(data[0].compare("height")))
-		{
-			height = stof(data[1]);
-		}
-		else if (!(data[0].compare("width")))
-		{
-			width = stof(data[1]);
-		}
-	}
-}
-
-// Read from .txt file camera
-void configCameraData(string configFilename, float &tX, float &tY, float &tZ, float &RX, float &RY, float &RZ)
-{
-	// Check if input or the file are empty
-	string dir = _CONFIG_DIR;
-	string filename = dir + configFilename;
-	if (!checkFileConfig(filename))
-	{
-		return;
-	}
-	ifstream file(filename);
-
-	// Read parameters from .txt file
-	string line;
-	while (getline(file, line))
-	{
-		size_t prev = 0;
-		size_t next = 0;
-		vector <String> data;
-
-		while ((next = line.find_first_of(" ", prev)) != string::npos)
-		{
-			if (next - prev != 0)
-			{
-				data.push_back(line.substr(prev, next - prev));
-			}
-			prev = next + 1;
-		}
-		if (prev < line.size())
-		{
-			data.push_back(line.substr(prev));
-		}
-
-		// Extract camera parameters
-		if (!(data[0].compare("TX")))
-		{
-			tX = stof(data[1]);
-		}
-		else if (!(data[0].compare("TY")))
-		{
-			tY = stof(data[1]);
-		}
-		else if (!(data[0].compare("TZ")))
-		{
-			tZ = stof(data[1]);
-		}
-		else if (!(data[0].compare("RX")))
-		{
-			RX = stof(data[1]);
-		}
-		else if (!(data[0].compare("RY")))
-		{
-			RY = stof(data[1]);
-		}
-		else if (!(data[0].compare("RZ")))
-		{
-			RZ = stof(data[1]);
-		}
-	}
-}
-
-// Miscellaneous parameters	- image plane, fitting and Canny edge
-void configParamsData(string configParamsFilename, int &imageWidth, int &imageHeight, int &mNum, int &maxIterations, float &threshold, float &ratio, int &kernel)
-{
-	// Check if input or the file are empty
-	string dir = _CONFIG_DIR;
-	string filename = dir + configParamsFilename;
-	if (!checkFileConfig(filename))
-	{
-		return;
-	}
-	ifstream file(filename);
-
-	// Read parameters from .txt file
-	string line;
-	while (getline(file, line))
-	{
-		size_t prev = 0;
-		size_t next = 0;
-		vector <String> data;
-
-		while ((next = line.find_first_of(" ", prev)) != string::npos)
-		{
-			if (next - prev != 0)
-			{
-				data.push_back(line.substr(prev, next - prev));
-			}
-			prev = next + 1;
-		}
-		if (prev < line.size())
-		{
-			data.push_back(line.substr(prev));
-		}
-
-		if (!(data[0].compare("WIDTH")))
-		{// Image plane parameters
-			imageWidth = stoi(data[1]);
-		}
-		else if (!(data[0].compare("HEIGHT")))
-		{
-			imageHeight = stoi(data[1]);
-		}
-		else if (!(data[0].compare("mNum")))
-		{// Fitting parameters
-			mNum = stoi(data[1]);
-		}
-		else if (!(data[0].compare("maxIterations")))
-		{
-			maxIterations = stoi(data[1]);
-		}
-		if (!(data[0].compare("threshold")))
-		{// Canny edge parameters
-			threshold = stof(data[1]);
-		}
-		if (!(data[0].compare("ratio")))
-		{
-			ratio = stof(data[1]);
-		}
-		if (!(data[0].compare("kernel")))
-		{
-			kernel = stoi(data[1]);
-		}
-	}
-}
-
-// Update filenames
-void readFilenames(string &srcImageFilename, string &videoFilename, string &configParamsFilename, string &modelFilename, string &configCameraFilename, Mat &srcData)
-{
-	char choice[] = "\0";
-	bool check = false;
-	// Source image filename
-	while (!check)
-	{
-		cout << "Source image file is: " << srcImageFilename << "; do you want to give new file? [Y/N]";
-		cin >> choice;
-		if (!strcmp("Y", choice))
-		{
-			cout << "Give new source image file: ";
-			string tmpFile;
-			cin >> tmpFile;
-			Mat tmpMat = imread(_VIDEO_DIR + tmpFile);
-			if (tmpMat.data == NULL)
-			{
-				cout << "Error opening image: " << tmpFile << endl;
-				check = false;
-			}
-			else
-			{
-				srcImageFilename = tmpFile;
-				srcData = imread(_VIDEO_DIR + srcImageFilename);
-				check = true;
-			}
-		}
-		else if (strcmp("N", choice) != 0)
-		{
-			cout << "Invalid option; Try again." << endl;
-			check = false;
-		}
-		else
-		{
-			check = true;
-		}
-	}
-
-	// Source video filename
-	check = false;
-	while (!check)
-	{
-		cout << "Source video file is: " << videoFilename << "; do you want to give new file? [Y/N]";
-		cin >> choice;
-		if (!strcmp("Y", choice))
-		{
-			cout << "Give new source video file: ";
-			string tmpFile;
-			cin >> tmpFile;
-			// Check if camera opened successfully
-			VideoCapture cap(_VIDEO_DIR + tmpFile);
-			if (!cap.isOpened()) 
-			{
-				cout << "Error opening video stream: " << _VIDEO_DIR + tmpFile << endl;
-				check = false;
-			}
-			else
-			{
-				videoFilename = tmpFile;
-				check = true;
-			}
-		}
-		else if (strcmp("N", choice) != 0)
-		{
-			cout << "Invalid option; Try again." << endl;
-			check = false;
-		}
-		else
-		{
-			check = true;
-		}
-	}
-
-	// Model
-	check = false;
-	while (!check)
-	{
-		cout << "Model file is: " << modelFilename << "; do you want to give a new file? [Y/N]";
-		cin >> choice;
-		if (!strcmp("Y", choice))
-		{
-			cout << "Give new model file: ";
-			string tmpFile;
-			cin >> tmpFile;
-			if (!checkFileModel(_MODEL_DIR + tmpFile))
-			{
-				check = false;
-			}
-			else
-			{
-				modelFilename = tmpFile;
-				check = true;
-			}
-		}
-		else if (strcmp("N", choice) != 0)
-		{
-			cout << "Invalid option; Try again." << endl;
-			check = false;
-		}
-		else
-		{
-			check = true;
-		}
-	}
-
-	// Camera parameters
-	check = false;
-	while (!check)
-	{
-		cout << "Camera parameters file is: " << configCameraFilename << "; do you want to give a new file? [Y/N]";
-		cin >> choice;
-		if (!strcmp("Y", choice))
-		{
-			cout << "Give new camera parameters file: ";
-			string tmpFile;
-			cin >> tmpFile;
-			if (!checkFileConfig(_CONFIG_DIR + tmpFile))
-			{
-				check = false;
-			}
-			else
-			{
-				configCameraFilename = tmpFile;
-				check = true;
-			}
-		}
-		else if (strcmp("N", choice) != 0)
-		{
-			cout << "Invalid option; Try again." << endl;
-			check = false;
-		}
-		else
-		{
-			check = true;
-		}
-	}
-
-	// Miscellaneous parameters
-	check = false;
-	while (!check)
-	{
-		cout << "Miscellaneous parameters file is: " << configParamsFilename << "; do you want to give a new file? [Y/N]";
-		cin >> choice;
-		if (!strcmp("Y", choice))
-		{
-			cout << "Give new miscellaneous parameters file: ";
-			string tmpFile;
-			cin >> tmpFile;
-			if (!checkFileConfig(_CONFIG_DIR + tmpFile))
-			{
-				check = false;
-			}
-			else
-			{
-				configParamsFilename = tmpFile;
-				check = true;
-			}
-		}
-		else if (strcmp("N", choice) != 0)
-		{
-			cout << "Invalid option; Try again." << endl;
-			check = false;
-		}
-		else
-		{
-			check = true;
 		}
 	}
 }
@@ -1058,6 +739,31 @@ void exportFittingData(Mat m, Mat x)
 	out.close();
 }
 
+// Export time passed
+void exportTime(vector<float> timePassed)
+{
+	ofstream out;
+	out.open("data/time.txt", ofstream::out | ofstream::trunc);
+	if (!out.is_open())
+	{
+		cout << "Problem with opening the file." << endl;
+		return;
+	}
+	
+	string s = "t = [";
+	for (size_t i = 0; i < timePassed.size(); i++)
+	{
+		ostringstream convert;
+		convert << timePassed[i];
+		s += convert.str();
+		s += (i < timePassed.size() - 1) ? " " : "];";
+	}
+
+	out << s;
+	out.flush();
+	out.close();
+}
+
 // Detect edges using Canny edge detector
 Mat detectEdges(Mat img, double threshold, double ratio, int kernel)
 {
@@ -1101,17 +807,33 @@ void playVideo(string videoFilename, Cuboid3D model, vector <float> params, floa
 {
 	// Create a VideoCapture object and open the input file
 	// If the input is the web camera, pass 0 instead of the video file name
-	string dir = _VIDEO_DIR;
-	VideoCapture cap(dir + videoFilename);
+	VideoCapture cap(videoFilename);
+	if (!cap.isOpened())
+	{
+		cout << "Error opening video stream: " << videoFilename << endl;
+		return;
+	}
 
 	// Virtual camera initialization
 	Camera virtualCam = createCam(Vec3f(params[0], params[1], params[2]), axisAngle2euler(Vec3f(params[3], params[4], params[5])), fov, imageWidth, imageHeight, vector <State> {X, Y, Z, R1, R2, R3});
 	// Model colour
 	Vec3b modelColour(0, 255, 0);
 
+#ifdef _COUNT_TIME
+	vector <float> timePassed;
+#endif // _COUNT_TIME
+
+
+#ifdef _EXPORT_VIDEO
+	VideoWriter oVideoWriter("data/exported_videos/video.mp4", CV_FOURCC('M', 'P', '4', 'V'), 30, Size(imageWidth, imageHeight), true); //initialize the VideoWriter object 
+#endif // _EXPORT_VIDEO
+
 	int count = 0;
 	while (1) 
 	{
+		// Start clock
+		auto start = chrono::high_resolution_clock::now();
+
 		// Capture frame-by-frame
 		Mat frame;
 		cap >> frame;
@@ -1124,11 +846,10 @@ void playVideo(string videoFilename, Cuboid3D model, vector <float> params, floa
 		if (count == 0)
 		{
 			size_t pos = videoFilename.find_last_of(".");
-			string filename = dir + videoFilename.substr(0, pos);
+			string filename = videoFilename.substr(0, pos);
 			filename += "FirstFrame.jpg";
 			imwrite(filename, frame);
 		}
-		++count;
 #endif // _CAP_FIRST_FRAME
 		
 		// Render frame
@@ -1145,7 +866,7 @@ void playVideo(string videoFilename, Cuboid3D model, vector <float> params, floa
 		Mat cubeEdgesInv = invertBinaryImage(cubeEdges);
 		// Calculate distance transform of data and it's first derivatives
 		Mat distTransform, dxDist, dyDist;
-		distanceTransform(cubeEdgesInv, distTransform, CV_DIST_L2, 3);
+		distanceTransform(cubeEdgesInv, distTransform, CV_DIST_L2, 5);
 		distTransformImageGradient(distTransform, dxDist, dyDist);
 
 		// Render model
@@ -1181,14 +902,44 @@ void playVideo(string videoFilename, Cuboid3D model, vector <float> params, floa
 #ifdef _DEBUG
 		// Display cube edges
 		displayImagePlane("Canny edges video", cubeEdges);
+		// Display distance transform
+		displayImagePlane("Distance Transform video", normalise(distTransform));
 		// Display virtual camera parameters
 		dispCamParamsVideo(virtualCam);
 #endif // _DEBUG
 
+#ifdef _EXPORT_FRAMES
+		static vector <int> png_params({ CV_IMWRITE_PNG_COMPRESSION, 0 });
+		static string dirExport = "data/exported_images/frames/";
+		imwrite(dirExport + "frame" + to_string(count) + ".png", imagePlane, png_params);
+#endif // _EXPORT_FRAMES
+		++count;
+
+#ifdef _EXPORT_VIDEO
+		oVideoWriter.write(imagePlane);
+#endif // _EXPORT_VIDEO
+
+
+		auto finish = chrono::high_resolution_clock::now();
+		chrono::duration<double> elapsed = finish - start; // Time elapsed between maxIterations
+		double fps30 = 33; // 33 miliseconds for 30 fps
+		// Delay for each frame
+		double elapsedms = elapsed.count() * 1000.0;
+		double delay = ((fps30 - elapsedms >= 0.0) ? fps30 - elapsedms : 0.0);
+#ifdef _COUNT_TIME
+		cout << "Elapsed time: " << elapsed.count() << " s\n";
+		timePassed.push_back(elapsed.count());
+#endif // _COUNT_TIME
+
 		// Press  ESC on keyboard to exit
-		if (waitKey(5) == 27)
+		if (waitKey(static_cast<int>(delay + 1.0)) == 27)
 			break;
 	}
+
+#ifdef _COUNT_TIME
+	exportTime(timePassed);
+#endif // _COUNT_TIME
+
 }
 
 // Use mouse to select 2D points and then give their corresponding 3D points
@@ -1240,8 +991,7 @@ void writeCamParams(string filename, vector <float> parameters)
 
 	// Open file
 	ofstream out;
-	string path = _CONFIG_DIR;
-	out.open(path + filename, ofstream::out | ofstream::trunc);
+	out.open(filename, ofstream::out | ofstream::trunc);
 	if (!out.is_open())
 	{
 		cout << "Problem with opening the file." << endl;

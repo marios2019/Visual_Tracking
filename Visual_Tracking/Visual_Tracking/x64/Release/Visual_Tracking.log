@@ -1,17 +1,9 @@
-﻿  Camera.cpp
-  CameraStateSpace.cpp
-  Cuboid2D.cpp
-  Cuboid3D.cpp
-  controls.cpp
-  error.cpp
-  mathLinearAlgebra.cpp
-  rotations3D.cpp
-  Source.cpp
+﻿  Source.cpp
   visualTracking.cpp
   Generating code
-  1596 of 1602 functions (99.6%) were compiled, the rest were copied from previous compilation.
-    3 functions were new in current compilation
-    0 functions had inline decision re-evaluated but remain unchanged
+  56 of 1872 functions ( 3.0%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    36 functions had inline decision re-evaluated but remain unchanged
   Finished generating code
-  Visual_Tracking.vcxproj -> C:\Users\marios\Desktop\Visual_Tracking\x64\Release\Visual_Tracking.exe
-  Visual_Tracking.vcxproj -> C:\Users\marios\Desktop\Visual_Tracking\x64\Release\Visual_Tracking.pdb (Full PDB)
+  Visual_Tracking.vcxproj -> D:\MegaSync\ΜΕΠ\Visual Tracking\Visual_Tracking\x64\Release\Visual_Tracking.exe
+  Visual_Tracking.vcxproj -> D:\MegaSync\ΜΕΠ\Visual Tracking\Visual_Tracking\x64\Release\Visual_Tracking.pdb (Full PDB)

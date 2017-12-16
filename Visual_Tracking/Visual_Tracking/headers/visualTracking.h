@@ -24,11 +24,15 @@ using namespace std;
 #include "controls.h"
 
 // Number of mijs
-#define _MNUM 5
+#define _MNUM 11
 
-#define _COUNT_TIME
+//#define _COUNT_TIME
 //#define _LOG
+//#define _EXPORT_IMAGES
 //#define _DEMO
+//#define _SHOW_CAM_PARAMS
+//#define _EXPORT_RENDER
+//#define _EXPORT_DT
 
 #ifdef _DEMO
 // Virtual Camera default extrinsics parameters

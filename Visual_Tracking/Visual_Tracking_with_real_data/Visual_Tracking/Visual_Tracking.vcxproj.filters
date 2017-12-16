@@ -45,6 +45,9 @@
     <ClCompile Include="source_code\mathLinearAlgebra.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="source_code\io.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="headers\Camera.h">
@@ -78,6 +81,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="headers\mathLinearAlgebra.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="headers\io.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

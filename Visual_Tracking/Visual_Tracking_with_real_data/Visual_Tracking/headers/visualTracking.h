@@ -22,25 +22,18 @@ using namespace std;
 #include "projectiveGeometry.h"
 #include "mathLinearAlgebra.h"
 #include "controls.h"
+#include "io.h"
 
 //#define _COUNT_TIME
 //#define _DEBUG
 //#define _CAP_FIRST_FRAME
+//#define _EXPORT_IMAGES
+//#define _EXPORT_FRAMES
+//#define _EXPORT_VIDEO
+//#define _EXPORT_RENDER
 
 // Visual tracker main function
 void visualTracker(Cuboid3D &model);
-
-// Read model data from .x file
-void modelData(string filename, float &length, float &height, float &width);
-
-// Read from .txt file camera parameters
-void configCameraData(string configFilename, float & tX, float & tY, float & tZ, float & RX, float & RY, float & RZ);
-
-// Miscellaneous parameters	- image plane, fitting and Canny edge
-void configParamsData(string configParamsFilename, int & imageWidth, int & imageHeight, int & mNum, int & maxIterations, float & threshold, float & ratio, int & kernel);
-
-// Update filenames
-void readFilenames(string &srcImageFilename, string &videoFilename, string &configParamsFilename, string & modelFilename, string & configCameraFilename, Mat & srcData);
 
 // Render function
 Cuboid2D rendering(Cuboid3D &cuboid3D, Camera &camera, Mat &imagePlane, Vec3b colour);
@@ -115,6 +108,9 @@ void errorSize(string input1, string input2, T size1, T size2, string filename, 
 
 // Export fitting data
 void exportFittingData(Mat m, Mat x);
+
+// Export time passed
+void exportTime(vector <float> timePassed);
 
 // Detect edges using Canny edge detector
 Mat detectEdges(Mat img, double threshold, double ratio, int kernel);
